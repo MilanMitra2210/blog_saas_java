@@ -1,11 +1,10 @@
-package com.quillforge.api.user.mapper;
+package com.quillforge.api.role.mapper;
 
+import com.quillforge.api.role.dto.CreateRoleDto;
 import com.quillforge.api.role.dto.RoleResponseDto;
+import com.quillforge.api.role.dto.UpdateRoleDto;
 import com.quillforge.api.role.entity.Role;
-import com.quillforge.api.user.dto.CreateUserDto;
 import com.quillforge.api.user.dto.UserAuditDto;
-import com.quillforge.api.user.dto.UserResponseDto;
-import com.quillforge.api.user.dto.UserUpdateDto;
 import com.quillforge.api.user.entity.User;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
@@ -15,21 +14,18 @@ import org.mapstruct.Named;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 
 @Mapper(componentModel = "spring")
-public interface UserMapper {
+public interface RoleMapper {
 
     @Mapping(source = "createdBy", target = "createdBy", qualifiedByName = "toAuditDto")
     @Mapping(source = "updatedBy", target = "updatedBy", qualifiedByName = "toAuditDto")
-    @Mapping(source = "roleRel", target = "roleRel", qualifiedByName = "toRoleDto")
-    UserResponseDto toDto(User user);
+    RoleResponseDto toDto(Role role);
 
     @Mapping(target = "createdBy", ignore = true)
     @Mapping(target = "updatedBy", ignore = true)
-    @Mapping(target = "roleRel", ignore = true)
-    User toEntity(CreateUserDto dto);
+    Role toEntity(CreateRoleDto dto);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
-    @Mapping(target = "roleRel", ignore = true)
-    void updateEntityFromDto(UserUpdateDto dto, @MappingTarget User user);
+    void updateEntityFromDto(UpdateRoleDto dto, @MappingTarget Role role);
 
     @Named("toAuditDto")
     default UserAuditDto toAuditDto(User user) {
@@ -38,17 +34,6 @@ public interface UserMapper {
         dto.setId(user.getId());
         dto.setName(user.getName());
         dto.setRole(user.getRole() != null ? user.getRole().name() : null);
-        return dto;
-    }
-
-    @Named("toRoleDto")
-    default RoleResponseDto toRoleDto(Role role) {
-        if (role == null) return null;
-        RoleResponseDto dto = new RoleResponseDto();
-        dto.setId(role.getId());
-        dto.setName(role.getName());
-        dto.setDescription(role.getDescription());
-        dto.setPermissions(role.getPermissions());
         return dto;
     }
 }

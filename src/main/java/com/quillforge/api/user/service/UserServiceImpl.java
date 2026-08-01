@@ -3,6 +3,7 @@ package com.quillforge.api.user.service;
 import com.quillforge.api.common.dto.PaginatedResponse;
 import com.quillforge.api.common.exception.BadRequestException;
 import com.quillforge.api.common.exception.ResourceNotFoundException;
+import com.quillforge.api.role.repository.RoleRepository;
 import com.quillforge.api.user.dto.ChangePasswordRequest;
 import com.quillforge.api.user.dto.CreateUserDto;
 import com.quillforge.api.user.dto.LoginRequest;
@@ -43,6 +44,7 @@ import java.util.UUID;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
@@ -119,7 +121,9 @@ public class UserServiceImpl implements UserService {
         user.setProvider(ProviderEnum.MANUAL);
         user.setActive(createDto.isActive());
         user.setImageId(createDto.getImageId());
-        user.setRoleId(createDto.getRoleId());
+        if (createDto.getRoleId() != null) {
+            roleRepository.findById(createDto.getRoleId()).ifPresent(user::setRoleRel);
+        }
 
         User saved = userRepository.save(user);
         return userMapper.toDto(saved);
@@ -217,6 +221,15 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", id));
         userMapper.updateEntityFromDto(updateDto, user);
+        
+        if (updateDto.getRoleId() != null) {
+            roleRepository.findById(updateDto.getRoleId()).ifPresent(user::setRoleRel);
+            user.setRole(RoleEnum.USER);
+        } else if (updateDto.getRole() != null) {
+            user.setRoleRel(null);
+            user.setRole(updateDto.getRole());
+        }
+        
         User savedUser = userRepository.save(user);
         return userMapper.toDto(savedUser);
     }

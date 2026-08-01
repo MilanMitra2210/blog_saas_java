@@ -1,5 +1,6 @@
 package com.quillforge.api.user.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -13,9 +14,13 @@ import lombok.Setter;
 @AllArgsConstructor
 public class TokenDto {
 
+    @JsonProperty("accessToken")
     private String accessToken;
+
+    @JsonProperty("refreshToken")
     private String refreshToken;
 
     @Builder.Default
+    @JsonProperty("tokenType")
     private String tokenType = "bearer";
 }

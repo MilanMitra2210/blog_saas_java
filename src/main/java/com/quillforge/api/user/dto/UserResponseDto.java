@@ -1,5 +1,6 @@
 package com.quillforge.api.user.dto;
 
+import com.quillforge.api.role.dto.RoleResponseDto;
 import com.quillforge.api.user.entity.User.RoleEnum;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,7 +16,7 @@ public class UserResponseDto {
     private String name;
     private String email;
     private RoleEnum role;
-    private UUID roleId;
+    private RoleResponseDto roleRel;
     private boolean active;
     private boolean blocked;
     private String blockReason;

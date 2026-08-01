@@ -1,10 +1,14 @@
 package com.quillforge.api.user.entity;
 
 import com.quillforge.api.common.entity.BaseEntity;
+import com.quillforge.api.role.entity.Role;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
@@ -55,8 +59,9 @@ public class User extends BaseEntity {
     @Column(name = "image_id")
     private UUID imageId;
 
-    @Column(name = "role_id")
-    private UUID roleId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "role_id")
+    private Role roleRel;
 
     public enum RoleEnum {
         USER, ADMIN
