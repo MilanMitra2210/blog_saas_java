@@ -1,0 +1,38 @@
+spring:
+  # ---- PostgreSQL Datasource ----
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  # ---- JPA / Hibernate dev settings ----
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+
+  # ---- Redis ----
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+# ---- Logging ----
+logging:
+  level:
+    com.quillforge: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+
+# ---- CORS ----
+app:
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:3002,http://localhost:5173
+  aws:
+    access-key: ${AWS_ACCESS_KEY_ID}
+    secret-key: ${AWS_ACCESS_SECRET}
+    region: ${AWS_REGION}
+    bucket-name: ${AWS_BUCKET}
+    endpoint: ${AWS_ENDPOINT}
+    cdn-url: ${AWS_CDN}

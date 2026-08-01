@@ -1,0 +1,70 @@
+spring:
+  application:
+    name: quillforge-api
+
+  profiles:
+    active: dev
+
+  # ---- JPA / Hibernate ----
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+    hibernate:
+      ddl-auto: update # Let Hibernate update tables during setup. We can switch to validate with Flyway once tables stabilize.
+
+  # ---- Flyway ----
+  flyway:
+    enabled: false # Keep false for now until we write specific migrations. We can rely on Hibernate auto-update initially.
+    baseline-on-migrate: true
+
+  # ---- Jackson ----
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+  # ---- Multipart Limits ----
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 100MB
+  mvc:
+    multipart:
+      resolve-lazily: true
+
+# ---- Server ----
+server:
+  port: 8080
+  servlet:
+    context-path: /api/v1
+
+# ---- Actuator ----
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+
+# ---- Swagger / OpenAPI ----
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+
+# ---- Custom JWT Settings ----
+app:
+  jwt:
+    secret: ${JWT_SECRET:dGhpcy1pcy1hLXNlY3JldC1rZXktZm9yLXF1aWxsZm9yZ2Utc3ByaW5nLWJvb3QtYmFja2VuZC1kZXZlbG9wbWVudC11c2U=}
+    expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}
+    refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
