@@ -24,6 +24,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.SimpleMailMessage;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
@@ -37,6 +39,7 @@ public class UserServiceImpl implements UserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
+    private final JavaMailSender mailSender;
 
     @Override
     public PaginatedResponse<UserResponseDto> getUsers(int page, int limit, String search, RoleEnum role, String status) {
@@ -60,13 +63,19 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserResponseDto register(CreateUserDto createDto) {
-        if (userRepository.existsByEmail(createDto.getEmail())) {
+        userRepository.findDeletedByEmail(createDto.getEmail()).ifPresent(deletedUser -> {
+            userRepository.hardDeleteById(deletedUser.getId());
+            userRepository.flush();
+        });
+
+        if (userRepository.existsActiveByEmail(createDto.getEmail())) {
             throw new BadRequestException("Email already registered");
         }
+
         User user = userMapper.toEntity(createDto);
         user.setPassword(passwordEncoder.encode(createDto.getPassword()));
-        // Match Python BE logic where registration creates ADMIN
-        user.setRole(RoleEnum.ADMIN);
+        // Default to USER role for sign-ups
+        user.setRole(RoleEnum.USER);
         user.setProvider(ProviderEnum.MANUAL);
         User saved = userRepository.save(user);
         return userMapper.toDto(saved);
@@ -207,7 +216,15 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
         String resetToken = tokenService.generateAccessToken(user);
-        System.out.println("🚀 [MOCK EMAIL] Password reset token for " + email + ": " + resetToken);
+        String link = "http://localhost:5174/reset-password?code=" + resetToken + "&type=reset-password";
+        
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(email);
+        message.setSubject("QuillForge Password Reset");
+        message.setText("Click the following link to reset your password: " + link);
+        mailSender.send(message);
+        
+        System.out.println("🚀 [EMAIL SENT] Click here to reset your password: " + link);
     }
 
     @Override
@@ -233,7 +250,15 @@ public class UserServiceImpl implements UserService {
                 .signWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor("dGhpcy1pcy1hLXNlY3JldC1rZXktZm9yLXF1aWxsZm9yZ2Utc3ByaW5nLWJvb3QtYmFja2VuZC1kZXZlbG9wbWVudC11c2U=".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
                 .compact();
 
-        System.out.println("🚀 [MOCK EMAIL] Invitation token sent to " + email + ": " + inviteToken);
+        String link = "http://localhost:5174/reset-password?code=" + inviteToken + "&type=invite";
+        
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(email);
+        message.setSubject("QuillForge Invitation");
+        message.setText("Click the following link to accept your invitation: " + link);
+        mailSender.send(message);
+
+        System.out.println("🚀 [EMAIL SENT] Click here to accept your invitation: " + link);
         return java.util.Map.of("success", true, "token", inviteToken);
     }
 

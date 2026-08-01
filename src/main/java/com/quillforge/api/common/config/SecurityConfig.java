@@ -34,7 +34,7 @@ public class SecurityConfig {
                                 "/users/forgot-password", "/users/reset-password", "/users/verify-invitation",
                                 "/users/social/**").permitAll()
                         // Public documentation
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/api-docs/**", "/swagger-ui.html").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/api-docs/**", "/swagger-ui.html", "/error").permitAll()
                         // Any other request must be authenticated
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
