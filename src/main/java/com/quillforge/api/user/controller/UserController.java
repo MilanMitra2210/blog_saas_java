@@ -2,6 +2,7 @@ package com.quillforge.api.user.controller;
 
 import com.quillforge.api.common.dto.ApiResponse;
 import com.quillforge.api.common.dto.PaginatedResponse;
+import com.quillforge.api.user.dto.CreateUserDto;
 import com.quillforge.api.user.dto.UserResponseDto;
 import com.quillforge.api.user.dto.UserUpdateDto;
 import com.quillforge.api.user.entity.User.RoleEnum;
@@ -10,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,6 +24,14 @@ import java.util.UUID;
 public class UserController {
 
     private final UserService userService;
+
+    @PostMapping
+    @Operation(summary = "Create user", description = "Creates a new user manually (Admin operations)")
+    public ResponseEntity<ApiResponse<UserResponseDto>> createUser(@Valid @RequestBody CreateUserDto createDto) {
+        UserResponseDto userDto = userService.createUser(createDto);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success("User created successfully", userDto));
+    }
 
     @GetMapping("/me")
     @Operation(summary = "Get current user profile", description = "Retrieves details of the authenticated user")

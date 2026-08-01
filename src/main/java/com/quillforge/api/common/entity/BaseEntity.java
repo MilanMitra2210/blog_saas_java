@@ -6,6 +6,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Version;
 import lombok.Getter;
 import lombok.Setter;
@@ -14,6 +17,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import com.quillforge.api.user.entity.User;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -40,12 +44,15 @@ public abstract class BaseEntity {
     @Column(nullable = false)
     private Instant updatedAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by", updatable = false)
     @CreatedBy
-    @Column(updatable = false)
-    private String createdBy;
+    private User createdBy;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "updated_by")
     @LastModifiedBy
-    private String updatedBy;
+    private User updatedBy;
 
     @Version
     private Long version;

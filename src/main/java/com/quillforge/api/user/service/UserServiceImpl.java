@@ -3,6 +3,7 @@ package com.quillforge.api.user.service;
 import com.quillforge.api.common.dto.PaginatedResponse;
 import com.quillforge.api.common.exception.BadRequestException;
 import com.quillforge.api.common.exception.ResourceNotFoundException;
+import com.quillforge.api.user.dto.ChangePasswordRequest;
 import com.quillforge.api.user.dto.CreateUserDto;
 import com.quillforge.api.user.dto.LoginRequest;
 import com.quillforge.api.user.dto.LoginResponseDto;
@@ -27,7 +28,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.transaction.annotation.Transactional;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Date;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -54,9 +61,16 @@ public class UserServiceImpl implements UserService {
         if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
             throw new BadRequestException("Not authenticated");
         }
-        String email = authentication.getName();
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+        String principal = authentication.getName();
+        User user;
+        try {
+            UUID userId = UUID.fromString(principal);
+            user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+        } catch (IllegalArgumentException e) {
+            user = userRepository.findByEmail(principal)
+                    .orElseThrow(() -> new ResourceNotFoundException("User", "email", principal));
+        }
         return userMapper.toDto(user);
     }
 
@@ -77,6 +91,36 @@ public class UserServiceImpl implements UserService {
         // Default to USER role for sign-ups
         user.setRole(RoleEnum.USER);
         user.setProvider(ProviderEnum.MANUAL);
+        User saved = userRepository.save(user);
+        return userMapper.toDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public UserResponseDto createUser(CreateUserDto createDto) {
+        userRepository.findDeletedByEmail(createDto.getEmail()).ifPresent(deletedUser -> {
+            userRepository.hardDeleteById(deletedUser.getId());
+            userRepository.flush();
+        });
+
+        if (userRepository.existsActiveByEmail(createDto.getEmail())) {
+            throw new BadRequestException("Email already registered");
+        }
+
+        User user = userMapper.toEntity(createDto);
+        user.setPassword(passwordEncoder.encode(createDto.getPassword()));
+        
+        if (createDto.getRole() != null) {
+            user.setRole(createDto.getRole());
+        } else {
+            user.setRole(RoleEnum.USER);
+        }
+        
+        user.setProvider(ProviderEnum.MANUAL);
+        user.setActive(createDto.isActive());
+        user.setImageId(createDto.getImageId());
+        user.setRoleId(createDto.getRoleId());
+
         User saved = userRepository.save(user);
         return userMapper.toDto(saved);
     }
@@ -184,20 +228,27 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", id));
         user.setDeleted(true);
-        user.setDeletedAt(java.time.Instant.now());
+        user.setDeletedAt(Instant.now());
         userRepository.save(user);
     }
 
     @Override
     @Transactional
-    public void changePassword(com.quillforge.api.user.dto.ChangePasswordRequest request) {
+    public void changePassword(ChangePasswordRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
             throw new BadRequestException("Not authenticated");
         }
-        String email = authentication.getName();
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+        String principal = authentication.getName();
+        User user;
+        try {
+            UUID userId = UUID.fromString(principal);
+            user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+        } catch (IllegalArgumentException e) {
+            user = userRepository.findByEmail(principal)
+                    .orElseThrow(() -> new ResourceNotFoundException("User", "email", principal));
+        }
 
         if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
             throw new BadRequestException("Invalid current password");
@@ -242,12 +293,12 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public java.util.Map<String, Object> inviteUser(String email) {
-        String inviteToken = io.jsonwebtoken.Jwts.builder()
+    public Map<String, Object> inviteUser(String email) {
+        String inviteToken = Jwts.builder()
                 .subject(email)
-                .issuedAt(new java.util.Date())
-                .expiration(new java.util.Date(System.currentTimeMillis() + 86400000))
-                .signWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor("dGhpcy1pcy1hLXNlY3JldC1rZXktZm9yLXF1aWxsZm9yZ2Utc3ByaW5nLWJvb3QtYmFja2VuZC1kZXZlbG9wbWVudC11c2U=".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 86400000))
+                .signWith(Keys.hmacShaKeyFor("dGhpcy1pcy1hLXNlY3JldC1rZXktZm9yLXF1aWxsZm9yZ2Utc3ByaW5nLWJvb3QtYmFja2VuZC1kZXZlbG9wbWVudC11c2U=".getBytes(StandardCharsets.UTF_8)))
                 .compact();
 
         String link = "http://localhost:5174/reset-password?code=" + inviteToken + "&type=invite";
@@ -259,19 +310,19 @@ public class UserServiceImpl implements UserService {
         mailSender.send(message);
 
         System.out.println("🚀 [EMAIL SENT] Click here to accept your invitation: " + link);
-        return java.util.Map.of("success", true, "token", inviteToken);
+        return Map.of("success", true, "token", inviteToken);
     }
 
     @Override
-    public java.util.Map<String, Object> verifyInvitation(String token) {
+    public Map<String, Object> verifyInvitation(String token) {
         try {
-            String email = io.jsonwebtoken.Jwts.parser()
-                    .verifyWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor("dGhpcy1pcy1hLXNlY3JldC1rZXktZm9yLXF1aWxsZm9yZ2Utc3ByaW5nLWJvb3QtYmFja2VuZC1kZXZlbG9wbWVudC11c2U=".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+            String email = Jwts.parser()
+                    .verifyWith(Keys.hmacShaKeyFor("dGhpcy1pcy1hLXNlY3JldC1rZXktZm9yLXF1aWxsZm9yZ2Utc3ByaW5nLWJvb3QtYmFja2VuZC1kZXZlbG9wbWVudC11c2U=".getBytes(StandardCharsets.UTF_8)))
                     .build()
                     .parseSignedClaims(token)
                     .getPayload()
                     .getSubject();
-            return java.util.Map.of("success", true, "email", email);
+            return Map.of("success", true, "email", email);
         } catch (Exception e) {
             throw new BadRequestException("Invalid or expired invitation token");
         }
@@ -299,7 +350,7 @@ public class UserServiceImpl implements UserService {
 
         return LoginResponseDto.builder()
                 .user(userMapper.toDto(user))
-                .tokens(com.quillforge.api.user.dto.TokenDto.builder()
+                .tokens(TokenDto.builder()
                         .accessToken(accessToken)
                         .refreshToken(refreshToken)
                         .build())

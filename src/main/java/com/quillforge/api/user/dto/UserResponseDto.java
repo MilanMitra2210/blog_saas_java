@@ -23,4 +23,6 @@ public class UserResponseDto {
     private UUID imageId;
     private Instant createdAt;
     private Instant updatedAt;
+    private UserAuditDto createdBy;
+    private UserAuditDto updatedBy;
 }
