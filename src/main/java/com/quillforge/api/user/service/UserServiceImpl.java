@@ -1,7 +1,12 @@
 package com.quillforge.api.user.service;
 
 import com.quillforge.api.common.dto.PaginatedResponse;
+import com.quillforge.api.common.exception.BadRequestException;
 import com.quillforge.api.common.exception.ResourceNotFoundException;
+import com.quillforge.api.user.dto.CreateUserDto;
+import com.quillforge.api.user.dto.LoginRequest;
+import com.quillforge.api.user.dto.LoginResponseDto;
+import com.quillforge.api.user.dto.TokenDto;
 import com.quillforge.api.user.dto.UserResponseDto;
 import com.quillforge.api.user.dto.UserUpdateDto;
 import com.quillforge.api.user.entity.User;
@@ -10,9 +15,14 @@ import com.quillforge.api.user.entity.User.ProviderEnum;
 import com.quillforge.api.user.mapper.UserMapper;
 import com.quillforge.api.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +35,8 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
+    private final TokenService tokenService;
 
     @Override
     public PaginatedResponse<UserResponseDto> getUsers(int page, int limit, String search, RoleEnum role, String status) {
@@ -34,23 +46,111 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    @Transactional
     public UserResponseDto getMe() {
-        // Fallback mock / first user lookup since security isn't wired yet
-        User user = userRepository.findByEmail("admin@quillforge.com")
-                .orElseGet(() -> {
-                    User newUser = new User();
-                    newUser.setName("Admin User");
-                    newUser.setEmail("admin@quillforge.com");
-                    newUser.setRole(RoleEnum.ADMIN);
-                    newUser.setActive(true);
-                    newUser.setProvider(ProviderEnum.MANUAL);
-                    return userRepository.save(newUser);
-                });
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            throw new BadRequestException("Not authenticated");
+        }
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
         return userMapper.toDto(user);
     }
 
     @Override
+    @Transactional
+    public UserResponseDto register(CreateUserDto createDto) {
+        if (userRepository.existsByEmail(createDto.getEmail())) {
+            throw new BadRequestException("Email already registered");
+        }
+        User user = userMapper.toEntity(createDto);
+        user.setPassword(passwordEncoder.encode(createDto.getPassword()));
+        // Match Python BE logic where registration creates ADMIN
+        user.setRole(RoleEnum.ADMIN);
+        user.setProvider(ProviderEnum.MANUAL);
+        User saved = userRepository.save(user);
+        return userMapper.toDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public LoginResponseDto login(LoginRequest loginRequest) {
+        User user = userRepository.findByEmail(loginRequest.getEmail())
+                .orElseThrow(() -> new BadRequestException("Invalid credentials"));
+
+        if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
+            throw new BadRequestException("Invalid credentials");
+        }
+
+        if (!user.isActive()) {
+            throw new BadRequestException("User account is inactive");
+        }
+
+        if (user.isBlocked()) {
+            throw new BadRequestException("User account has been blocked: " + user.getBlockReason());
+        }
+
+        String accessToken = tokenService.generateAccessToken(user);
+        String refreshToken = tokenService.generateRefreshToken(user);
+
+        user.setRefreshToken(refreshToken);
+        userRepository.save(user);
+
+        return LoginResponseDto.builder()
+                .user(userMapper.toDto(user))
+                .tokens(TokenDto.builder()
+                        .accessToken(accessToken)
+                        .refreshToken(refreshToken)
+                        .build())
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public TokenDto refreshToken(String refreshToken) {
+        if (!tokenService.validateToken(refreshToken)) {
+            throw new BadRequestException("Invalid refresh token");
+        }
+
+        String email = tokenService.getEmailFromToken(refreshToken)
+                .orElseThrow(() -> new BadRequestException("Invalid refresh token claims"));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("User not found"));
+
+        if (!refreshToken.equals(user.getRefreshToken())) {
+            throw new BadRequestException("Token mismatch or revoked");
+        }
+
+        String newAccessToken = tokenService.generateAccessToken(user);
+        String newRefreshToken = tokenService.generateRefreshToken(user);
+
+        user.setRefreshToken(newRefreshToken);
+        userRepository.save(user);
+
+        return TokenDto.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void logout() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            return;
+        }
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user != null) {
+            user.setRefreshToken("");
+            userRepository.save(user);
+        }
+    }
+
+    @Override
+    @Cacheable(value = "users", key = "#id")
     public UserResponseDto getUserById(UUID id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", id));
@@ -59,6 +159,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "users", key = "#id")
     public UserResponseDto updateUser(UUID id, UserUpdateDto updateDto) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", id));
@@ -69,11 +170,114 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "users", key = "#id")
     public void deleteUser(UUID id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User", id));
         user.setDeleted(true);
         user.setDeletedAt(java.time.Instant.now());
         userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(com.quillforge.api.user.dto.ChangePasswordRequest request) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+            throw new BadRequestException("Not authenticated");
+        }
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+            throw new BadRequestException("Invalid current password");
+        }
+
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new BadRequestException("New password cannot be the same as the current password");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
+
+    @Override
+    public void forgotPassword(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+        String resetToken = tokenService.generateAccessToken(user);
+        System.out.println("🚀 [MOCK EMAIL] Password reset token for " + email + ": " + resetToken);
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(String token, String password) {
+        if (!tokenService.validateToken(token)) {
+            throw new BadRequestException("Invalid or expired password reset token");
+        }
+        String email = tokenService.getEmailFromToken(token)
+                .orElseThrow(() -> new BadRequestException("Invalid token claims"));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
+        user.setPassword(passwordEncoder.encode(password));
+        userRepository.save(user);
+    }
+
+    @Override
+    public java.util.Map<String, Object> inviteUser(String email) {
+        String inviteToken = io.jsonwebtoken.Jwts.builder()
+                .subject(email)
+                .issuedAt(new java.util.Date())
+                .expiration(new java.util.Date(System.currentTimeMillis() + 86400000))
+                .signWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor("dGhpcy1pcy1hLXNlY3JldC1rZXktZm9yLXF1aWxsZm9yZ2Utc3ByaW5nLWJvb3QtYmFja2VuZC1kZXZlbG9wbWVudC11c2U=".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                .compact();
+
+        System.out.println("🚀 [MOCK EMAIL] Invitation token sent to " + email + ": " + inviteToken);
+        return java.util.Map.of("success", true, "token", inviteToken);
+    }
+
+    @Override
+    public java.util.Map<String, Object> verifyInvitation(String token) {
+        try {
+            String email = io.jsonwebtoken.Jwts.parser()
+                    .verifyWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor("dGhpcy1pcy1hLXNlY3JldC1rZXktZm9yLXF1aWxsZm9yZ2Utc3ByaW5nLWJvb3QtYmFja2VuZC1kZXZlbG9wbWVudC11c2U=".getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload()
+                    .getSubject();
+            return java.util.Map.of("success", true, "email", email);
+        } catch (Exception e) {
+            throw new BadRequestException("Invalid or expired invitation token");
+        }
+    }
+
+    @Override
+    @Transactional
+    public LoginResponseDto socialLogin(String provider) {
+        String email = provider + "-user@quillforge.com";
+        User user = userRepository.findByEmail(email)
+                .orElseGet(() -> {
+                    User newUser = new User();
+                    newUser.setName(provider.substring(0, 1).toUpperCase() + provider.substring(1) + " User");
+                    newUser.setEmail(email);
+                    newUser.setRole(RoleEnum.USER);
+                    newUser.setActive(true);
+                    newUser.setProvider(ProviderEnum.valueOf(provider.toUpperCase()));
+                    return userRepository.save(newUser);
+                });
+
+        String accessToken = tokenService.generateAccessToken(user);
+        String refreshToken = tokenService.generateRefreshToken(user);
+        user.setRefreshToken(refreshToken);
+        userRepository.save(user);
+
+        return LoginResponseDto.builder()
+                .user(userMapper.toDto(user))
+                .tokens(com.quillforge.api.user.dto.TokenDto.builder()
+                        .accessToken(accessToken)
+                        .refreshToken(refreshToken)
+                        .build())
+                .build();
     }
 }

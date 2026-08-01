@@ -1,5 +1,6 @@
 package com.quillforge.api.user.mapper;
 
+import com.quillforge.api.user.dto.CreateUserDto;
 import com.quillforge.api.user.dto.UserResponseDto;
 import com.quillforge.api.user.dto.UserUpdateDto;
 import com.quillforge.api.user.entity.User;
@@ -12,6 +13,8 @@ import org.mapstruct.NullValuePropertyMappingStrategy;
 public interface UserMapper {
 
     UserResponseDto toDto(User user);
+
+    User toEntity(CreateUserDto dto);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void updateEntityFromDto(UserUpdateDto dto, @MappingTarget User user);
