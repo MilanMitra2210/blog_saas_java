@@ -21,7 +21,6 @@ spring:
 
   # ---- Jackson ----
   jackson:
-    property-naming-strategy: SNAKE_CASE
     serialization:
       write-dates-as-timestamps: false
     deserialization:

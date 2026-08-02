@@ -55,7 +55,8 @@ public abstract class BaseEntity {
     private User updatedBy;
 
     @Version
-    private Long version;
+    @Column(nullable = false)
+    private Long version = 0L;
 
     @Column(nullable = false)
     private boolean deleted = false;

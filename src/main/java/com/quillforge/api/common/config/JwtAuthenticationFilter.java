@@ -33,6 +33,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain) throws ServletException, IOException {
 
+        String path = request.getRequestURI();
+        if (path.contains("/admin/blogs/import/template")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         try {
             extractJwtFromRequest(request)
                     .filter(tokenService::validateToken)

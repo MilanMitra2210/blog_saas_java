@@ -1,5 +1,6 @@
 package com.quillforge.api.user.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.quillforge.api.role.dto.RoleResponseDto;
 import com.quillforge.api.user.entity.User.RoleEnum;
 import lombok.Getter;
@@ -22,8 +23,16 @@ public class UserResponseDto {
     private String blockReason;
     private String provider;
     private UUID imageId;
+
+    @JsonProperty("createdAt")
     private Instant createdAt;
+
+    @JsonProperty("updatedAt")
     private Instant updatedAt;
+
+    @JsonProperty("createdBy")
     private UserAuditDto createdBy;
+
+    @JsonProperty("updatedBy")
     private UserAuditDto updatedBy;
 }
