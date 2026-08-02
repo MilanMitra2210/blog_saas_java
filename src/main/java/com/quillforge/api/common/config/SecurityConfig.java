@@ -35,6 +35,8 @@ public class SecurityConfig {
                         .requestMatchers("/users/login", "/users/register", "/users/refresh-token",
                                 "/users/forgot-password", "/users/reset-password", "/users/verify-invitation",
                                 "/users/social/**").permitAll()
+                        // Public storefront paths
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/pages", "/pages/**").permitAll()
                         // Public documentation
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/api-docs/**", "/swagger-ui.html", "/error").permitAll()
                         // Any other request must be authenticated
