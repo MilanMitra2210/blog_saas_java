@@ -1,6 +1,7 @@
 package com.quillforge.api.user.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.quillforge.api.media.dto.MediaDto;
 import com.quillforge.api.role.dto.RoleResponseDto;
 import com.quillforge.api.user.entity.User.RoleEnum;
 import lombok.Getter;
@@ -23,6 +24,7 @@ public class UserResponseDto {
     private String blockReason;
     private String provider;
     private UUID imageId;
+    private MediaDto image;
 
     @JsonProperty("createdAt")
     private Instant createdAt;

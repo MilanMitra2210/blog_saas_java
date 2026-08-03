@@ -1,5 +1,6 @@
 package com.quillforge.api.user.mapper;
 
+import com.quillforge.api.media.mapper.MediaMapper;
 import com.quillforge.api.role.dto.RoleResponseDto;
 import com.quillforge.api.role.entity.Role;
 import com.quillforge.api.user.dto.CreateUserDto;
@@ -14,7 +15,7 @@ import org.mapstruct.MappingTarget;
 import org.mapstruct.Named;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", uses = {MediaMapper.class})
 public interface UserMapper {
 
     @Mapping(source = "createdBy", target = "createdBy", qualifiedByName = "toAuditDto")

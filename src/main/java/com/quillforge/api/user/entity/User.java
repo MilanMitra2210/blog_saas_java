@@ -1,6 +1,7 @@
 package com.quillforge.api.user.entity;
 
 import com.quillforge.api.common.entity.BaseEntity;
+import com.quillforge.api.media.entity.Media;
 import com.quillforge.api.role.entity.Role;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -58,6 +59,10 @@ public class User extends BaseEntity {
 
     @Column(name = "image_id")
     private UUID imageId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "image_id", insertable = false, updatable = false)
+    private Media image;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "role_id")
