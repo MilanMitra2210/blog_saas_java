@@ -51,4 +51,8 @@ public interface BlogService {
     // Ratings & Metrics
     BlogResponse rateBlog(UUID blogId, double rating);
     BlogMetricDto incrementMetric(UUID blogId, String metricType);
+    BlogMetricDto incrementMetricWithReferrer(UUID blogId, String metricType, String referrer);
+
+    // Sitemap Data
+    SitemapDataDto getSitemapData();
 }

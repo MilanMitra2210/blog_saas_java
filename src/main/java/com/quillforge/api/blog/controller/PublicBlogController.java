@@ -90,9 +90,12 @@ public class PublicBlogController {
     }
 
     @PostMapping("/{blogId}/views")
-    @Operation(summary = "Track post view metric")
-    public ResponseEntity<ApiResponse<BlogMetricDto>> trackView(@PathVariable UUID blogId) {
-        BlogMetricDto response = blogService.incrementMetric(blogId, "view");
+    @Operation(summary = "Track post view metric with referrer")
+    public ResponseEntity<ApiResponse<BlogMetricDto>> trackView(
+            @PathVariable UUID blogId,
+            @RequestParam(value = "referrer", required = false) String referrer
+    ) {
+        BlogMetricDto response = blogService.incrementMetricWithReferrer(blogId, "view", referrer);
         return ResponseEntity.ok(ApiResponse.success("View tracked successfully", response));
     }
 
@@ -108,5 +111,12 @@ public class PublicBlogController {
     public ResponseEntity<ApiResponse<BlogMetricDto>> trackReadProgress(@PathVariable UUID blogId) {
         BlogMetricDto response = blogService.incrementMetric(blogId, "read_progress");
         return ResponseEntity.ok(ApiResponse.success("Read progress tracked successfully", response));
+    }
+
+    @GetMapping("/sitemap-data")
+    @Operation(summary = "Get sitemap data (published blogs, categories, and CMS pages with last modified dates)")
+    public ResponseEntity<ApiResponse<SitemapDataDto>> getSitemapData() {
+        SitemapDataDto response = blogService.getSitemapData();
+        return ResponseEntity.ok(ApiResponse.success("Sitemap data retrieved successfully", response));
     }
 }

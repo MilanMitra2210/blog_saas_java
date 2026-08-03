@@ -16,4 +16,10 @@ public class BlogMetricDto {
 
     @JsonProperty("readProgressCount")
     private int readProgressCount;
+
+    private int googleViews;
+    private int twitterViews;
+    private int linkedinViews;
+    private int directViews;
+    private int otherViews;
 }

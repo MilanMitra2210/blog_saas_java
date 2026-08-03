@@ -28,4 +28,19 @@ public class BlogMetric {
 
     @Column(name = "read_progress_count", nullable = false)
     private int readProgressCount = 0;
+
+    @Column(name = "google_views", nullable = false)
+    private int googleViews = 0;
+
+    @Column(name = "twitter_views", nullable = false)
+    private int twitterViews = 0;
+
+    @Column(name = "linkedin_views", nullable = false)
+    private int linkedinViews = 0;
+
+    @Column(name = "direct_views", nullable = false)
+    private int directViews = 0;
+
+    @Column(name = "other_views", nullable = false)
+    private int otherViews = 0;
 }

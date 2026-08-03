@@ -1,5 +1,7 @@
 package com.quillforge.api.blog.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.quillforge.api.user.dto.UserAuditDto;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -14,4 +16,10 @@ public class TagDto {
     private String slug;
     private Instant createdAt;
     private Instant updatedAt;
+
+    @JsonProperty("createdBy")
+    private UserAuditDto createdBy;
+
+    @JsonProperty("updatedBy")
+    private UserAuditDto updatedBy;
 }

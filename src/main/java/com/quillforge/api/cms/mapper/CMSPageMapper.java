@@ -5,24 +5,12 @@ import com.quillforge.api.cms.dto.CMSPageResponse;
 import com.quillforge.api.cms.entity.CMSPage;
 import com.quillforge.api.common.mapper.ContentBlockMapper;
 import com.quillforge.api.common.mapper.SeoMapper;
-import com.quillforge.api.user.entity.User;
+import com.quillforge.api.user.mapper.UserMapper;
 import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.Named;
 
-@Mapper(componentModel = "spring", uses = {SeoMapper.class, ContentBlockMapper.class})
+@Mapper(componentModel = "spring", uses = {SeoMapper.class, ContentBlockMapper.class, UserMapper.class})
 public interface CMSPageMapper {
-    @Mapping(target = "createdBy", source = "createdBy", qualifiedByName = "userToString")
-    @Mapping(target = "updatedBy", source = "updatedBy", qualifiedByName = "userToString")
     CMSPageResponse toResponse(CMSPage page);
 
     CMSPage toEntity(CMSPageRequest request);
-
-    @Named("userToString")
-    default String userToString(User user) {
-        if (user == null) {
-            return null;
-        }
-        return user.getName() != null ? user.getName() : user.getEmail();
-    }
 }

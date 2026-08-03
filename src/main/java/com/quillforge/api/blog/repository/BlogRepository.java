@@ -24,4 +24,6 @@ public interface BlogRepository extends JpaRepository<Blog, UUID> {
             @Param("categoryId") UUID categoryId,
             Pageable pageable
     );
+
+    java.util.List<Blog> findByIsPublishedTrue();
 }

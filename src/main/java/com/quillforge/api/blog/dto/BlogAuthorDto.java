@@ -2,6 +2,7 @@ package com.quillforge.api.blog.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.quillforge.api.media.dto.MediaDto;
+import com.quillforge.api.user.dto.UserAuditDto;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -19,4 +20,10 @@ public class BlogAuthorDto {
     private MediaDto image;
     private Instant createdAt;
     private Instant updatedAt;
+
+    @JsonProperty("createdBy")
+    private UserAuditDto createdBy;
+
+    @JsonProperty("updatedBy")
+    private UserAuditDto updatedBy;
 }

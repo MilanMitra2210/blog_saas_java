@@ -12,6 +12,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Version;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
@@ -47,11 +49,13 @@ public abstract class BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", updatable = false)
     @CreatedBy
+    @NotFound(action = NotFoundAction.IGNORE)
     private User createdBy;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "updated_by")
     @LastModifiedBy
+    @NotFound(action = NotFoundAction.IGNORE)
     private User updatedBy;
 
     @Version
@@ -62,4 +66,7 @@ public abstract class BaseEntity {
     private boolean deleted = false;
 
     private Instant deletedAt;
+
+    @Column(name = "tenant_id", nullable = false, columnDefinition = "VARCHAR(64) DEFAULT 'default'")
+    private String tenantId = "default";
 }

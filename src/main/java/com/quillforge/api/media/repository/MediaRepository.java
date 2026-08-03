@@ -15,7 +15,7 @@ import java.util.UUID;
 public interface MediaRepository extends JpaRepository<Media, UUID> {
 
     @Query("SELECT m FROM Media m WHERE " +
-            "(:folderId IS NULL AND m.folderId IS NULL OR m.folderId = :folderId) AND " +
+            "(:folderId IS NULL OR m.folderId = :folderId) AND " +
             "(:search IS NULL OR :search = '' OR LOWER(m.name) LIKE LOWER(CONCAT('%', :search, '%')))")
     Page<Media> findAllFiltered(
             @Param("folderId") UUID folderId,

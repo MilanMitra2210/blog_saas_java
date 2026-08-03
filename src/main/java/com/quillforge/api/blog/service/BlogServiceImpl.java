@@ -3,6 +3,7 @@ package com.quillforge.api.blog.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.quillforge.api.blog.dto.*;
 import com.quillforge.api.blog.entity.*;
+import com.quillforge.api.cms.entity.CMSPage;
 import com.quillforge.api.blog.mapper.BlogMapper;
 import com.quillforge.api.blog.repository.*;
 import com.quillforge.api.common.dto.PaginatedResponse;
@@ -12,6 +13,7 @@ import com.quillforge.api.common.exception.ResourceNotFoundException;
 import com.quillforge.api.common.mapper.SeoMapper;
 import com.quillforge.api.media.entity.Media;
 import com.quillforge.api.media.repository.MediaRepository;
+import com.quillforge.api.cms.repository.CMSPageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -29,6 +31,10 @@ import java.util.*;
 @Slf4j
 public class BlogServiceImpl implements BlogService {
 
+    private final BlogCategoryService blogCategoryService;
+    private final BlogAuthorService blogAuthorService;
+    private final TagService tagService;
+
     private final BlogRepository blogRepository;
     private final BlogCategoryRepository blogCategoryRepository;
     private final BlogAuthorRepository blogAuthorRepository;
@@ -37,172 +43,100 @@ public class BlogServiceImpl implements BlogService {
     private final BlogRevisionRepository blogRevisionRepository;
     private final BlogSlugRedirectRepository blogSlugRedirectRepository;
     private final MediaRepository mediaRepository;
+    private final CMSPageRepository cmsPageRepository;
 
     private final BlogMapper blogMapper;
     private final SeoMapper seoMapper;
     private final ObjectMapper objectMapper;
 
-    // ---- Categories ----
+    // ---- Categories (Delegated) ----
 
     @Override
     public PaginatedResponse<BlogCategoryDto> getCategories(int page, int limit, String search) {
-        PageRequest pageRequest = PageRequest.of(page - 1, limit, Sort.by("name").ascending());
-        Page<BlogCategory> categoryPage = blogCategoryRepository.findAllFiltered(search, pageRequest);
-        return PaginatedResponse.of(categoryPage, blogMapper::toDto);
+        return blogCategoryService.getCategories(page, limit, search);
     }
 
     @Override
     public List<BlogCategoryDto> getAllCategories() {
-        return blogCategoryRepository.findAll(Sort.by("name").ascending())
-                .stream()
-                .map(blogMapper::toDto)
-                .toList();
+        return blogCategoryService.getAllCategories();
     }
 
     @Override
     @Transactional
     public BlogCategoryDto createCategory(BlogCategoryDto dto) {
-        if (blogCategoryRepository.existsBySlug(dto.getSlug())) {
-            throw new BadRequestException("Category with slug '" + dto.getSlug() + "' already exists");
-        }
-        BlogCategory cat = blogMapper.toEntity(dto);
-        return blogMapper.toDto(blogCategoryRepository.save(cat));
+        return blogCategoryService.createCategory(dto);
     }
 
     @Override
     @Transactional
     public BlogCategoryDto updateCategory(UUID id, BlogCategoryDto dto) {
-        BlogCategory cat = blogCategoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category", id));
-
-        blogCategoryRepository.findBySlug(dto.getSlug()).ifPresent(existing -> {
-            if (!existing.getId().equals(id)) {
-                throw new BadRequestException("Category with slug '" + dto.getSlug() + "' already exists");
-            }
-        });
-
-        cat.setName(dto.getName());
-        cat.setSlug(dto.getSlug());
-        cat.setActive(dto.isActive());
-        return blogMapper.toDto(blogCategoryRepository.save(cat));
+        return blogCategoryService.updateCategory(id, dto);
     }
 
     @Override
     @Transactional
     public void deleteCategory(UUID id) {
-        BlogCategory cat = blogCategoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Category", id));
-        cat.setDeleted(true);
-        cat.setDeletedAt(Instant.now());
-        blogCategoryRepository.save(cat);
+        blogCategoryService.deleteCategory(id);
     }
 
-    // ---- Authors ----
+    // ---- Authors (Delegated) ----
 
     @Override
     public PaginatedResponse<BlogAuthorDto> getAuthors(int page, int limit, String search) {
-        PageRequest pageRequest = PageRequest.of(page - 1, limit, Sort.by("name").ascending());
-        Page<BlogAuthor> authorPage = blogAuthorRepository.findAllFiltered(search, pageRequest);
-        return PaginatedResponse.of(authorPage, blogMapper::toDto);
+        return blogAuthorService.getAuthors(page, limit, search);
     }
 
     @Override
     public List<BlogAuthorDto> getAllAuthors() {
-        return blogAuthorRepository.findAll(Sort.by("name").ascending())
-                .stream()
-                .map(blogMapper::toDto)
-                .toList();
+        return blogAuthorService.getAllAuthors();
     }
 
     @Override
     @Transactional
     public BlogAuthorDto createAuthor(BlogAuthorDto dto) {
-        BlogAuthor author = blogMapper.toEntity(dto);
-        if (dto.getImageId() != null) {
-            author.setImage(mediaRepository.findById(dto.getImageId()).orElse(null));
-        }
-        return blogMapper.toDto(blogAuthorRepository.save(author));
+        return blogAuthorService.createAuthor(dto);
     }
 
     @Override
     @Transactional
     public BlogAuthorDto updateAuthor(UUID id, BlogAuthorDto dto) {
-        BlogAuthor author = blogAuthorRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Author", id));
-
-        author.setName(dto.getName());
-        author.setBio(dto.getBio());
-        author.setDesignation(dto.getDesignation());
-        if (dto.getImageId() != null) {
-            author.setImage(mediaRepository.findById(dto.getImageId()).orElse(null));
-        } else {
-            author.setImage(null);
-        }
-        return blogMapper.toDto(blogAuthorRepository.save(author));
+        return blogAuthorService.updateAuthor(id, dto);
     }
 
     @Override
     @Transactional
     public void deleteAuthor(UUID id) {
-        BlogAuthor author = blogAuthorRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Author", id));
-        author.setDeleted(true);
-        author.setDeletedAt(Instant.now());
-        blogAuthorRepository.save(author);
+        blogAuthorService.deleteAuthor(id);
     }
 
-    // ---- Tags ----
+    // ---- Tags (Delegated) ----
 
     @Override
     public PaginatedResponse<TagDto> getTags(int page, int limit, String search) {
-        PageRequest pageRequest = PageRequest.of(page - 1, limit, Sort.by("name").ascending());
-        Page<Tag> tagPage = tagRepository.findAllFiltered(search, pageRequest);
-        return PaginatedResponse.of(tagPage, blogMapper::toDto);
+        return tagService.getTags(page, limit, search);
     }
 
     @Override
     public List<TagDto> getAllTags() {
-        return tagRepository.findAll(Sort.by("name").ascending())
-                .stream()
-                .map(blogMapper::toDto)
-                .toList();
+        return tagService.getAllTags();
     }
 
     @Override
     @Transactional
     public TagDto createTag(TagDto dto) {
-        if (tagRepository.existsBySlug(dto.getSlug())) {
-            throw new BadRequestException("Tag with slug '" + dto.getSlug() + "' already exists");
-        }
-        Tag tag = blogMapper.toEntity(dto);
-        return blogMapper.toDto(tagRepository.save(tag));
+        return tagService.createTag(dto);
     }
 
     @Override
     @Transactional
     public TagDto updateTag(UUID id, TagDto dto) {
-        Tag tag = tagRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Tag", id));
-
-        tagRepository.findBySlug(dto.getSlug()).ifPresent(existing -> {
-            if (!existing.getId().equals(id)) {
-                throw new BadRequestException("Tag with slug '" + dto.getSlug() + "' already exists");
-            }
-        });
-
-        tag.setName(dto.getName());
-        tag.setSlug(dto.getSlug());
-        return blogMapper.toDto(tagRepository.save(tag));
+        return tagService.updateTag(id, dto);
     }
 
     @Override
     @Transactional
     public void deleteTag(UUID id) {
-        Tag tag = tagRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Tag", id));
-        tag.setDeleted(true);
-        tag.setDeletedAt(Instant.now());
-        tagRepository.save(tag);
+        tagService.deleteTag(id);
     }
 
     // ---- Blogs ----
@@ -495,6 +429,10 @@ public class BlogServiceImpl implements BlogService {
     @Override
     @Transactional
     public BlogMetricDto incrementMetric(UUID blogId, String metricType) {
+        return incrementMetricWithReferrer(blogId, metricType, null);
+    }
+
+    public BlogMetricDto incrementMetricWithReferrer(UUID blogId, String metricType, String referrer) {
         BlogMetric metric = blogMetricRepository.findByBlogId(blogId)
                 .orElseGet(() -> {
                     BlogMetric m = new BlogMetric();
@@ -504,6 +442,20 @@ public class BlogServiceImpl implements BlogService {
 
         if ("view".equalsIgnoreCase(metricType)) {
             metric.setViews(metric.getViews() + 1);
+            if (referrer != null && !referrer.isBlank()) {
+                String refLower = referrer.toLowerCase();
+                if (refLower.contains("google")) {
+                    metric.setGoogleViews(metric.getGoogleViews() + 1);
+                } else if (refLower.contains("twitter") || refLower.contains("t.co") || refLower.contains("x.com")) {
+                    metric.setTwitterViews(metric.getTwitterViews() + 1);
+                } else if (refLower.contains("linkedin")) {
+                    metric.setLinkedinViews(metric.getLinkedinViews() + 1);
+                } else {
+                    metric.setOtherViews(metric.getOtherViews() + 1);
+                }
+            } else {
+                metric.setDirectViews(metric.getDirectViews() + 1);
+            }
         } else if ("like".equalsIgnoreCase(metricType)) {
             metric.setLikes(metric.getLikes() + 1);
         } else if ("read_progress".equalsIgnoreCase(metricType)) {
@@ -644,5 +596,27 @@ public class BlogServiceImpl implements BlogService {
         data.put("sections", sections);
 
         return data;
+    }
+
+    @Override
+    public SitemapDataDto getSitemapData() {
+        List<SitemapDataDto.SitemapItem> blogs = blogRepository.findByIsPublishedTrue().stream()
+                .map(b -> new SitemapDataDto.SitemapItem(b.getSlug(), b.getUpdatedAt()))
+                .toList();
+
+        List<SitemapDataDto.SitemapItem> categories = blogCategoryRepository.findAll().stream()
+                .map(c -> new SitemapDataDto.SitemapItem(c.getSlug(), c.getUpdatedAt()))
+                .toList();
+
+        List<SitemapDataDto.SitemapItem> cmsPages = cmsPageRepository.findAll().stream()
+                .filter(CMSPage::isActive)
+                .map(p -> new SitemapDataDto.SitemapItem(p.getSlug(), p.getUpdatedAt()))
+                .toList();
+
+        return SitemapDataDto.builder()
+                .blogs(blogs)
+                .categories(categories)
+                .cmsPages(cmsPages)
+                .build();
     }
 }

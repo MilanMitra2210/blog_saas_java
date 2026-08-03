@@ -80,4 +80,32 @@ public class Blog extends BaseEntity {
             inverseJoinColumns = @JoinColumn(name = "tag_id")
     )
     private List<Tag> tags = new ArrayList<>();
+
+    @PrePersist
+    @PreUpdate
+    public void calculateReadTime() {
+        StringBuilder textBuilder = new StringBuilder();
+        if (title != null) textBuilder.append(title).append(" ");
+        if (excerpt != null) textBuilder.append(excerpt).append(" ");
+
+        if (sections != null) {
+            for (BlogSection sec : sections) {
+                if (sec.getTitle() != null) textBuilder.append(sec.getTitle()).append(" ");
+                if (sec.getContent() != null) textBuilder.append(sec.getContent().toString()).append(" ");
+                if (sec.getSubSections() != null) {
+                    for (BlogSubSection sub : sec.getSubSections()) {
+                        if (sub.getTitle() != null) textBuilder.append(sub.getTitle()).append(" ");
+                        if (sub.getContent() != null) textBuilder.append(sub.getContent().toString()).append(" ");
+                    }
+                }
+            }
+        }
+
+        String fullText = textBuilder.toString().replaceAll("<[^>]*>", " ");
+        String[] words = fullText.trim().split("\\s+");
+        int wordCount = words.length == 1 && words[0].isEmpty() ? 0 : words.length;
+
+        // Average reading speed: 200 words per minute
+        this.readTime = Math.max(1, (int) Math.ceil(wordCount / 200.0));
+    }
 }
