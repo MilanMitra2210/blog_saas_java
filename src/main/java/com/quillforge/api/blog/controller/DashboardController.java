@@ -22,6 +22,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import com.quillforge.api.enquiry.entity.Enquiry;
+import com.quillforge.api.enquiry.repository.EnquiryRepository;
+import com.quillforge.api.enquiry.mapper.EnquiryMapper;
+import com.quillforge.api.enquiry.dto.EnquiryResponseDto;
 
 import org.springframework.transaction.annotation.Transactional;
 import java.text.SimpleDateFormat;
@@ -39,6 +43,8 @@ public class DashboardController {
     private final BlogRepository blogRepository;
     private final BlogCommentRepository blogCommentRepository;
     private final BlogMetricRepository blogMetricRepository;
+    private final EnquiryRepository enquiryRepository;
+    private final EnquiryMapper enquiryMapper;
 
     @GetMapping("/stats")
     @Transactional(readOnly = true)
@@ -47,9 +53,8 @@ public class DashboardController {
         long totalBlogs = blogRepository.count();
         long totalComments = blogCommentRepository.count();
 
-        // Enquiries are not implemented in Spring Boot, so returning 0
-        long totalEnquiries = 0;
-        long pendingEnquiries = 0;
+        long totalEnquiries = enquiryRepository.count();
+        long pendingEnquiries = enquiryRepository.countByStatus("pending");
 
         List<Map<String, Object>> recentBlogs = new ArrayList<>();
         List<Blog> recentBlogsList = blogRepository.findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt"))).getContent();
@@ -64,7 +69,11 @@ public class DashboardController {
             recentBlogs.add(map);
         }
 
-        List<Map<String, Object>> recentEnquiries = new ArrayList<>();
+        List<EnquiryResponseDto> recentEnquiries = enquiryRepository.findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")))
+                .getContent()
+                .stream()
+                .map(enquiryMapper::toDto)
+                .toList();
 
         // Aggregate stats
         List<BlogMetric> metrics = blogMetricRepository.findAll();
