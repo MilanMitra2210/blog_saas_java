@@ -68,3 +68,7 @@ app:
     secret: ${JWT_SECRET:dGhpcy1pcy1hLXNlY3JldC1rZXktZm9yLXF1aWxsZm9yZ2Utc3ByaW5nLWJvb3QtYmFja2VuZC1kZXZlbG9wbWVudC11c2U=}
     expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}
     refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+  revalidate:
+    frontend-url: ${FRONTEND_URL:http://localhost:3000}
+    secret: ${REVALIDATION_SECRET:quillforge-revalidate-secret-key}
+

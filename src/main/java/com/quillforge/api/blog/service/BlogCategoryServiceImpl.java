@@ -19,11 +19,15 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import com.quillforge.api.common.service.RevalidationService;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 @Slf4j
 public class BlogCategoryServiceImpl implements BlogCategoryService {
+
+    private final RevalidationService revalidationService;
 
     private final BlogCategoryRepository blogCategoryRepository;
     private final BlogMapper blogMapper;
@@ -50,7 +54,9 @@ public class BlogCategoryServiceImpl implements BlogCategoryService {
             throw new BadRequestException("Category with slug '" + dto.getSlug() + "' already exists");
         }
         BlogCategory cat = blogMapper.toEntity(dto);
-        return blogMapper.toDto(blogCategoryRepository.save(cat));
+        BlogCategory saved = blogCategoryRepository.save(cat);
+        revalidationService.revalidate("blog_category", saved.getSlug(), "create");
+        return blogMapper.toDto(saved);
     }
 
     @Override
@@ -68,7 +74,9 @@ public class BlogCategoryServiceImpl implements BlogCategoryService {
         cat.setName(dto.getName());
         cat.setSlug(dto.getSlug());
         cat.setActive(dto.isActive());
-        return blogMapper.toDto(blogCategoryRepository.save(cat));
+        BlogCategory saved = blogCategoryRepository.save(cat);
+        revalidationService.revalidate("blog_category", saved.getSlug(), "update");
+        return blogMapper.toDto(saved);
     }
 
     @Override
@@ -78,6 +86,7 @@ public class BlogCategoryServiceImpl implements BlogCategoryService {
                 .orElseThrow(() -> new ResourceNotFoundException("Category", id));
         cat.setDeleted(true);
         cat.setDeletedAt(Instant.now());
-        blogCategoryRepository.save(cat);
+        BlogCategory saved = blogCategoryRepository.save(cat);
+        revalidationService.revalidate("blog_category", saved.getSlug(), "delete");
     }
 }

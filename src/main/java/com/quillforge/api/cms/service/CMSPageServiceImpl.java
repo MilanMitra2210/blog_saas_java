@@ -20,13 +20,18 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.cache.annotation.Cacheable;
 import java.time.Instant;
 import java.util.UUID;
+
+import com.quillforge.api.common.service.RevalidationService;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class CMSPageServiceImpl implements CMSPageService {
+
+    private final RevalidationService revalidationService;
 
     private final CMSPageRepository cmsPageRepository;
     private final MediaRepository mediaRepository;
@@ -35,6 +40,7 @@ public class CMSPageServiceImpl implements CMSPageService {
     private final SeoMapper seoMapper;
 
     @Override
+    @Cacheable(value = "cms_pages_list", key = "'list:' + (#search ?: '') + '-' + (#status ?: '') + '-' + #pageable.pageNumber + '-' + #pageable.pageSize")
     public Page<CMSPageResponse> getCMSPages(String search, String status, Pageable pageable) {
         Boolean isActive = null;
         if ("active".equalsIgnoreCase(status)) {
@@ -75,6 +81,7 @@ public class CMSPageServiceImpl implements CMSPageService {
         }
 
         CMSPage saved = cmsPageRepository.save(page);
+        revalidationService.revalidate("cms_page", saved.getSlug(), "create");
         return cmsPageMapper.toResponse(saved);
     }
 
@@ -122,6 +129,7 @@ public class CMSPageServiceImpl implements CMSPageService {
         }
 
         CMSPage updated = cmsPageRepository.save(page);
+        revalidationService.revalidate("cms_page", updated.getSlug(), "update");
         return cmsPageMapper.toResponse(updated);
     }
 
@@ -141,6 +149,7 @@ public class CMSPageServiceImpl implements CMSPageService {
     }
 
     @Override
+    @Cacheable(value = "cms_pages", key = "#slug")
     public CMSPageResponse getCMSPageBySlug(String slug) {
         CMSPage page = cmsPageRepository.findBySlug(slug)
                 .orElseThrow(() -> new ResourceNotFoundException("CMSPage with slug: " + slug));
@@ -163,6 +172,7 @@ public class CMSPageServiceImpl implements CMSPageService {
 
         page.setDeleted(true);
         page.setDeletedAt(Instant.now());
-        cmsPageRepository.save(page);
+        CMSPage saved = cmsPageRepository.save(page);
+        revalidationService.revalidate("cms_page", saved.getSlug(), "delete");
     }
 }

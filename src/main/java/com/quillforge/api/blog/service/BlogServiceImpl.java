@@ -25,11 +25,17 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.*;
 
+import com.quillforge.api.common.service.RevalidationService;
+
+import org.springframework.cache.annotation.Cacheable;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 @Slf4j
 public class BlogServiceImpl implements BlogService {
+
+    private final RevalidationService revalidationService;
 
     private final BlogCategoryService blogCategoryService;
     private final BlogAuthorService blogAuthorService;
@@ -142,6 +148,7 @@ public class BlogServiceImpl implements BlogService {
     // ---- Blogs ----
 
     @Override
+    @Cacheable(value = "blogs_list", key = "'list:' + (#search ?: '') + '-' + (#status ?: '') + '-' + (#categoryId != null ? #categoryId.toString() : '') + '-' + #page + '-' + #limit")
     public PaginatedResponse<BlogResponse> getBlogs(int page, int limit, String search, String status, UUID categoryId) {
         Boolean isPublished = null;
         if ("published".equalsIgnoreCase(status)) {
@@ -170,6 +177,7 @@ public class BlogServiceImpl implements BlogService {
     }
 
     @Override
+    @Cacheable(value = "blogs", key = "#slug")
     public BlogResponse getBlogBySlug(String slug) {
         Blog blog = blogRepository.findBySlug(slug)
                 .orElseThrow(() -> new ResourceNotFoundException("Blog with slug: " + slug));
@@ -194,6 +202,8 @@ public class BlogServiceImpl implements BlogService {
         BlogMetric metric = new BlogMetric();
         metric.setBlogId(saved.getId());
         blogMetricRepository.save(metric);
+
+        revalidationService.revalidate("blog", saved.getSlug(), "create");
 
         return getBlogById(saved.getId());
     }
@@ -239,6 +249,7 @@ public class BlogServiceImpl implements BlogService {
         mapRequestToBlog(request, blog);
 
         blogRepository.save(blog);
+        revalidationService.revalidate("blog", blog.getSlug(), "update");
         return getBlogById(blog.getId());
     }
 
@@ -249,7 +260,8 @@ public class BlogServiceImpl implements BlogService {
                 .orElseThrow(() -> new ResourceNotFoundException("Blog", id));
         blog.setDeleted(true);
         blog.setDeletedAt(Instant.now());
-        blogRepository.save(blog);
+        Blog saved = blogRepository.save(blog);
+        revalidationService.revalidate("blog", saved.getSlug(), "delete");
     }
 
     // ---- Revisions ----

@@ -9,6 +9,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.quillforge.api.common.service.RevalidationService;
+
+import org.springframework.cache.annotation.Cacheable;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -16,9 +20,11 @@ public class CompanySettingServiceImpl implements CompanySettingService {
 
     private final CompanySettingRepository companySettingRepository;
     private final CompanySettingMapper companySettingMapper;
+    private final RevalidationService revalidationService;
 
     @Override
     @Transactional
+    @Cacheable(value = "company_settings")
     public CompanySettingResponseDto getCompanySettings() {
         CompanySetting setting = getOrCreateInstance();
         return companySettingMapper.toDto(setting);
@@ -30,6 +36,7 @@ public class CompanySettingServiceImpl implements CompanySettingService {
         CompanySetting setting = getOrCreateInstance();
         companySettingMapper.updateEntityFromDto(dto, setting);
         CompanySetting saved = companySettingRepository.save(setting);
+        revalidationService.revalidate("company_settings", null, "update");
         return companySettingMapper.toDto(saved);
     }
 
