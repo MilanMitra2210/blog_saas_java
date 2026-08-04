@@ -21,10 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.cache.annotation.Cacheable;
+import com.quillforge.api.common.service.RevalidationService;
 import java.time.Instant;
 import java.util.UUID;
-
-import com.quillforge.api.common.service.RevalidationService;
 
 @Service
 @RequiredArgsConstructor

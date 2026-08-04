@@ -43,4 +43,16 @@ public class BlogMetric {
 
     @Column(name = "other_views", nullable = false)
     private int otherViews = 0;
+
+    @Column(name = "unique_views", nullable = false)
+    private int uniqueViews = 0;
+
+    @Column(name = "mobile_views", nullable = false)
+    private int mobileViews = 0;
+
+    @Column(name = "tablet_views", nullable = false)
+    private int tabletViews = 0;
+
+    @Column(name = "desktop_views", nullable = false)
+    private int desktopViews = 0;
 }

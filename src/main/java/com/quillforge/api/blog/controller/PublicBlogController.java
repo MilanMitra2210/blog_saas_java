@@ -93,10 +93,30 @@ public class PublicBlogController {
     @Operation(summary = "Track post view metric with referrer")
     public ResponseEntity<ApiResponse<BlogMetricDto>> trackView(
             @PathVariable UUID blogId,
-            @RequestParam(value = "referrer", required = false) String referrer
+            @RequestParam(value = "referrer", required = false) String referrer,
+            jakarta.servlet.http.HttpServletRequest request
     ) {
-        BlogMetricDto response = blogService.incrementMetricWithReferrer(blogId, "view", referrer);
+        String ipAddress = getClientIp(request);
+        String userAgent = request.getHeader("User-Agent");
+        BlogMetricDto response = blogService.incrementMetricWithAnalytics(blogId, "view", referrer, ipAddress, userAgent);
         return ResponseEntity.ok(ApiResponse.success("View tracked successfully", response));
+    }
+
+    private String getClientIp(jakarta.servlet.http.HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 
     @PostMapping("/{blogId}/likes")

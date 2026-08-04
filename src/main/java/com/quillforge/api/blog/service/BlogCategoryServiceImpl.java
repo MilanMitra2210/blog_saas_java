@@ -15,11 +15,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.quillforge.api.common.service.RevalidationService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-
-import com.quillforge.api.common.service.RevalidationService;
 
 @Service
 @RequiredArgsConstructor

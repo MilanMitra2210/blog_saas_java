@@ -88,6 +88,10 @@ public class DashboardController {
         long linkedinViews = 0;
         long directViews = 0;
         long otherViews = 0;
+        long totalUniqueViews = 0;
+        long totalMobileViews = 0;
+        long totalTabletViews = 0;
+        long totalDesktopViews = 0;
         for (BlogMetric m : metrics) {
             totalViews += m.getViews();
             totalLikes += m.getLikes();
@@ -97,6 +101,10 @@ public class DashboardController {
             linkedinViews += m.getLinkedinViews();
             directViews += m.getDirectViews();
             otherViews += m.getOtherViews();
+            totalUniqueViews += m.getUniqueViews();
+            totalMobileViews += m.getMobileViews();
+            totalTabletViews += m.getTabletViews();
+            totalDesktopViews += m.getDesktopViews();
         }
 
         long overallReach = totalViews + (totalComments * 5) + (totalLikes * 2);
@@ -175,6 +183,10 @@ public class DashboardController {
         analytics.put("twitterViews", twitterViews);
         analytics.put("linkedinViews", linkedinViews);
         analytics.put("directViews", directViews + otherViews);
+        analytics.put("totalUniqueViews", totalUniqueViews);
+        analytics.put("mobileViews", totalMobileViews);
+        analytics.put("tabletViews", totalTabletViews);
+        analytics.put("desktopViews", totalDesktopViews);
         analytics.put("topPosts", topPosts);
         analytics.put("timeline", timeline);
 
@@ -236,6 +248,10 @@ public class DashboardController {
             item.put("twitterViews", metric.getTwitterViews());
             item.put("linkedinViews", metric.getLinkedinViews());
             item.put("directViews", metric.getDirectViews() + metric.getOtherViews());
+            item.put("uniqueViews", metric.getUniqueViews());
+            item.put("mobileViews", metric.getMobileViews());
+            item.put("tabletViews", metric.getTabletViews());
+            item.put("desktopViews", metric.getDesktopViews());
             items.add(item);
         }
 
@@ -283,6 +299,10 @@ public class DashboardController {
             m.setLinkedinViews((int) (m.getViews() * 0.2));
             m.setDirectViews((int) (m.getViews() * 0.1));
             m.setOtherViews((int) (m.getViews() * 0.1));
+            m.setUniqueViews((int) (m.getViews() * (Math.random() * 0.2 + 0.6)));
+            m.setMobileViews((int) (m.getViews() * 0.5));
+            m.setTabletViews((int) (m.getViews() * 0.15));
+            m.setDesktopViews((int) (m.getViews() * 0.35));
             return blogMetricRepository.save(m);
         });
     }

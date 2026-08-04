@@ -22,4 +22,8 @@ public class BlogMetricDto {
     private int linkedinViews;
     private int directViews;
     private int otherViews;
+    private int uniqueViews;
+    private int mobileViews;
+    private int tabletViews;
+    private int desktopViews;
 }

@@ -16,6 +16,8 @@ import com.quillforge.api.media.repository.MediaRepository;
 import com.quillforge.api.cms.repository.CMSPageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.quillforge.api.common.service.RevalidationService;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -24,10 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
-
-import com.quillforge.api.common.service.RevalidationService;
-
-import org.springframework.cache.annotation.Cacheable;
+import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +50,7 @@ public class BlogServiceImpl implements BlogService {
     private final BlogSlugRedirectRepository blogSlugRedirectRepository;
     private final MediaRepository mediaRepository;
     private final CMSPageRepository cmsPageRepository;
+    private final BlogViewLogRepository blogViewLogRepository;
 
     private final BlogMapper blogMapper;
     private final SeoMapper seoMapper;
@@ -441,10 +442,18 @@ public class BlogServiceImpl implements BlogService {
     @Override
     @Transactional
     public BlogMetricDto incrementMetric(UUID blogId, String metricType) {
-        return incrementMetricWithReferrer(blogId, metricType, null);
+        return incrementMetricWithAnalytics(blogId, metricType, null, null, null);
     }
 
+    @Override
+    @Transactional
     public BlogMetricDto incrementMetricWithReferrer(UUID blogId, String metricType, String referrer) {
+        return incrementMetricWithAnalytics(blogId, metricType, referrer, null, null);
+    }
+
+    @Override
+    @Transactional
+    public BlogMetricDto incrementMetricWithAnalytics(UUID blogId, String metricType, String referrer, String ipAddress, String userAgent) {
         BlogMetric metric = blogMetricRepository.findByBlogId(blogId)
                 .orElseGet(() -> {
                     BlogMetric m = new BlogMetric();
@@ -468,6 +477,26 @@ public class BlogServiceImpl implements BlogService {
             } else {
                 metric.setDirectViews(metric.getDirectViews() + 1);
             }
+
+            String ipHash = hashIpAddress(ipAddress);
+            boolean isUnique = !blogViewLogRepository.existsByBlogIdAndIpHash(blogId, ipHash);
+            if (isUnique && !"unknown".equals(ipHash)) {
+                BlogViewLog viewLog = new BlogViewLog();
+                viewLog.setBlogId(blogId);
+                viewLog.setIpHash(ipHash);
+                blogViewLogRepository.save(viewLog);
+
+                metric.setUniqueViews(metric.getUniqueViews() + 1);
+
+                String device = detectDevice(userAgent);
+                if ("mobile".equals(device)) {
+                    metric.setMobileViews(metric.getMobileViews() + 1);
+                } else if ("tablet".equals(device)) {
+                    metric.setTabletViews(metric.getTabletViews() + 1);
+                } else {
+                    metric.setDesktopViews(metric.getDesktopViews() + 1);
+                }
+            }
         } else if ("like".equalsIgnoreCase(metricType)) {
             metric.setLikes(metric.getLikes() + 1);
         } else if ("read_progress".equalsIgnoreCase(metricType)) {
@@ -477,6 +506,40 @@ public class BlogServiceImpl implements BlogService {
         }
 
         return blogMapper.toDto(blogMetricRepository.save(metric));
+    }
+
+    private String hashIpAddress(String ipAddress) {
+        if (ipAddress == null || ipAddress.isBlank()) {
+            return "unknown";
+        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(ipAddress.trim().getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (Exception e) {
+            log.error("Failed to hash IP address", e);
+            return "error-hash";
+        }
+    }
+
+    private String detectDevice(String userAgent) {
+        if (userAgent == null || userAgent.isBlank()) {
+            return "desktop";
+        }
+        String uaLower = userAgent.toLowerCase();
+        if (uaLower.contains("tablet") || uaLower.contains("ipad") || uaLower.contains("playbook")) {
+            return "tablet";
+        }
+        if (uaLower.contains("mobi") || uaLower.contains("android") || uaLower.contains("iphone")) {
+            return "mobile";
+        }
+        return "desktop";
     }
 
     // ---- Internals ----
