@@ -30,9 +30,15 @@ public class PublicBlogController {
             @RequestParam(value = "limit", defaultValue = "10") int limit,
             @RequestParam(value = "search", required = false) String search,
             @RequestParam(value = "status", required = false) String status,
-            @RequestParam(value = "category_id", required = false) UUID categoryId
+            @RequestParam(value = "category_id", required = false) String categoryParam,
+            @RequestParam(value = "category_slug", required = false) String categorySlug,
+            @RequestParam(value = "tag", required = false) String tag,
+            @RequestParam(value = "tag_slug", required = false) String tagSlug,
+            @RequestParam(value = "tag_id", required = false) String tagIdParam
     ) {
-        PaginatedResponse<BlogResponse> response = blogService.getBlogs(page, limit, search, status, categoryId);
+        String cat = categorySlug != null ? categorySlug : categoryParam;
+        String tagParam = tag != null ? tag : (tagSlug != null ? tagSlug : tagIdParam);
+        PaginatedResponse<BlogResponse> response = blogService.getBlogs(page, limit, search, status, cat, tagParam);
         return ResponseEntity.ok(ApiResponse.success("Blogs retrieved successfully", response));
     }
 

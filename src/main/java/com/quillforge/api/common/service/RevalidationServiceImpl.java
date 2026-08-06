@@ -56,7 +56,7 @@ public class RevalidationServiceImpl implements RevalidationService {
 
     private void evictSpringCache(String model, String slug) {
         try {
-            if ("blog".equals(model) || "blog_category".equals(model)) {
+            if ("blog".equals(model) || "blog_category".equals(model) || "blog_tag".equals(model) || "blog_author".equals(model)) {
                 clearCache("blogs_list");
                 if (slug != null) {
                     evictKey("blogs", slug);
@@ -92,9 +92,11 @@ public class RevalidationServiceImpl implements RevalidationService {
 
     private void invalidateRedisKeys(String model, String slug) {
         try {
-            if ("blog".equals(model) || "blog_category".equals(model)) {
+            if ("blog".equals(model) || "blog_category".equals(model) || "blog_tag".equals(model) || "blog_author".equals(model)) {
                 deleteKeysByPattern("cache:get_blogs:*");
                 deleteKeysByPattern("cache:get_blog_categories:*");
+                deleteKeysByPattern("cache:get_tags:*");
+                deleteKeysByPattern("cache:get_authors:*");
                 if (slug != null) {
                     deleteKey("cache:get_blog_by_slug:slug=" + slug);
                 }

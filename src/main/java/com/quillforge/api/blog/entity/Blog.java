@@ -53,14 +53,17 @@ public class Blog extends BaseEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
+    @NotFound(action = NotFoundAction.IGNORE)
     private BlogCategory category;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id")
+    @NotFound(action = NotFoundAction.IGNORE)
     private BlogAuthor author;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "banner_image_id")
+    @NotFound(action = NotFoundAction.IGNORE)
     private Media bannerImage;
 
     @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

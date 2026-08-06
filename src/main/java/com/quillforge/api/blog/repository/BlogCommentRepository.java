@@ -14,6 +14,8 @@ public interface BlogCommentRepository extends JpaRepository<BlogComment, UUID> 
 
     List<BlogComment> findByPostIdAndApprovedTrueAndParentIdIsNullOrderByCreatedAtAsc(UUID postId);
 
+    long countByPostIdAndApprovedTrue(UUID postId);
+
     @Query("SELECT c FROM BlogComment c WHERE c.postId = :postId AND c.approved = :approved AND c.parentId IS NULL")
     Page<BlogComment> findThreadsByPostIdAndApproved(
             @Param("postId") UUID postId,

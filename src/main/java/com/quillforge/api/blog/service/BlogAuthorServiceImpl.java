@@ -1,11 +1,14 @@
 package com.quillforge.api.blog.service;
 
 import com.quillforge.api.blog.dto.BlogAuthorDto;
+import com.quillforge.api.blog.entity.Blog;
 import com.quillforge.api.blog.entity.BlogAuthor;
 import com.quillforge.api.blog.mapper.BlogMapper;
 import com.quillforge.api.blog.repository.BlogAuthorRepository;
+import com.quillforge.api.blog.repository.BlogRepository;
 import com.quillforge.api.common.dto.PaginatedResponse;
 import com.quillforge.api.common.exception.ResourceNotFoundException;
+import com.quillforge.api.common.service.RevalidationService;
 import com.quillforge.api.media.entity.Media;
 import com.quillforge.api.media.repository.MediaRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,8 +30,10 @@ import java.util.UUID;
 public class BlogAuthorServiceImpl implements BlogAuthorService {
 
     private final BlogAuthorRepository blogAuthorRepository;
+    private final BlogRepository blogRepository;
     private final MediaRepository mediaRepository;
     private final BlogMapper blogMapper;
+    private final RevalidationService revalidationService;
 
     @Override
     public PaginatedResponse<BlogAuthorDto> getAuthors(int page, int limit, String search) {
@@ -54,7 +59,9 @@ public class BlogAuthorServiceImpl implements BlogAuthorService {
                     .orElseThrow(() -> new ResourceNotFoundException("Media", dto.getImageId()));
             author.setImage(img);
         }
-        return blogMapper.toDto(blogAuthorRepository.save(author));
+        BlogAuthor saved = blogAuthorRepository.save(author);
+        revalidationService.revalidate("blog_author", saved.getName(), "create");
+        return blogMapper.toDto(saved);
     }
 
     @Override
@@ -75,7 +82,9 @@ public class BlogAuthorServiceImpl implements BlogAuthorService {
             author.setImage(null);
         }
 
-        return blogMapper.toDto(blogAuthorRepository.save(author));
+        BlogAuthor saved = blogAuthorRepository.save(author);
+        revalidationService.revalidate("blog_author", saved.getName(), "update");
+        return blogMapper.toDto(saved);
     }
 
     @Override
@@ -83,8 +92,26 @@ public class BlogAuthorServiceImpl implements BlogAuthorService {
     public void deleteAuthor(UUID id) {
         BlogAuthor author = blogAuthorRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Author", id));
+
+        // Find primary active author to reassign blogs to (or clear if none)
+        BlogAuthor fallbackAuthor = blogAuthorRepository.findAll().stream()
+                .filter(a -> !a.getId().equals(id) && !a.isDeleted())
+                .findFirst()
+                .orElse(null);
+
+        // Reassign any blogs referencing this author to avoid EntityNotFoundException
+        List<Blog> blogs = blogRepository.findAll().stream()
+                .filter(b -> b.getAuthor() != null && b.getAuthor().getId().equals(id))
+                .toList();
+
+        for (Blog b : blogs) {
+            b.setAuthor(fallbackAuthor);
+            blogRepository.save(b);
+        }
+
         author.setDeleted(true);
         author.setDeletedAt(Instant.now());
         blogAuthorRepository.save(author);
+        revalidationService.revalidate("blog_author", author.getName(), "delete");
     }
 }

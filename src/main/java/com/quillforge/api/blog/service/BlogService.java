@@ -31,7 +31,7 @@ public interface BlogService {
     void deleteTag(UUID id);
 
     // Blogs
-    PaginatedResponse<BlogResponse> getBlogs(int page, int limit, String search, String status, UUID categoryId);
+    PaginatedResponse<BlogResponse> getBlogs(int page, int limit, String search, String status, String categoryParam, String tagParam);
     BlogResponse getBlogById(UUID id);
     BlogResponse getBlogBySlug(String slug);
     BlogResponse createBlog(BlogRequest request);

@@ -7,6 +7,7 @@ import com.quillforge.api.blog.repository.TagRepository;
 import com.quillforge.api.common.dto.PaginatedResponse;
 import com.quillforge.api.common.exception.BadRequestException;
 import com.quillforge.api.common.exception.ResourceNotFoundException;
+import com.quillforge.api.common.service.RevalidationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -27,6 +28,7 @@ public class TagServiceImpl implements TagService {
 
     private final TagRepository tagRepository;
     private final BlogMapper blogMapper;
+    private final RevalidationService revalidationService;
 
     @Override
     public PaginatedResponse<TagDto> getTags(int page, int limit, String search) {
@@ -50,7 +52,9 @@ public class TagServiceImpl implements TagService {
             throw new BadRequestException("Tag with slug '" + dto.getSlug() + "' already exists");
         }
         Tag tag = blogMapper.toEntity(dto);
-        return blogMapper.toDto(tagRepository.save(tag));
+        Tag saved = tagRepository.save(tag);
+        revalidationService.revalidate("blog_tag", saved.getSlug(), "create");
+        return blogMapper.toDto(saved);
     }
 
     @Override
@@ -67,7 +71,9 @@ public class TagServiceImpl implements TagService {
 
         tag.setName(dto.getName());
         tag.setSlug(dto.getSlug());
-        return blogMapper.toDto(tagRepository.save(tag));
+        Tag saved = tagRepository.save(tag);
+        revalidationService.revalidate("blog_tag", saved.getSlug(), "update");
+        return blogMapper.toDto(saved);
     }
 
     @Override
@@ -78,5 +84,6 @@ public class TagServiceImpl implements TagService {
         tag.setDeleted(true);
         tag.setDeletedAt(Instant.now());
         tagRepository.save(tag);
+        revalidationService.revalidate("blog_tag", tag.getSlug(), "delete");
     }
 }

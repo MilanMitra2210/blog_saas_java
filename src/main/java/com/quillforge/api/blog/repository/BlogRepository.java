@@ -14,14 +14,20 @@ public interface BlogRepository extends JpaRepository<Blog, UUID> {
     Optional<Blog> findBySlug(String slug);
     boolean existsBySlug(String slug);
 
-    @Query("SELECT b FROM Blog b WHERE " +
+    @Query("SELECT DISTINCT b FROM Blog b LEFT JOIN b.tags t WHERE " +
            "(:search IS NULL OR :search = '' OR LOWER(b.title) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(b.excerpt) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
            "(:isPublished IS NULL OR b.isPublished = :isPublished) AND " +
-           "(:categoryId IS NULL OR b.category.id = :categoryId)")
+           "(:categoryId IS NULL OR b.category.id = :categoryId) AND " +
+           "(:categorySlug IS NULL OR :categorySlug = '' OR b.category.slug = :categorySlug) AND " +
+           "(:tagId IS NULL OR t.id = :tagId) AND " +
+           "(:tagSlug IS NULL OR :tagSlug = '' OR LOWER(t.slug) = LOWER(:tagSlug) OR LOWER(t.name) = LOWER(:tagSlug))")
     Page<Blog> findAllFiltered(
             @Param("search") String search,
             @Param("isPublished") Boolean isPublished,
             @Param("categoryId") UUID categoryId,
+            @Param("categorySlug") String categorySlug,
+            @Param("tagId") UUID tagId,
+            @Param("tagSlug") String tagSlug,
             Pageable pageable
     );
 

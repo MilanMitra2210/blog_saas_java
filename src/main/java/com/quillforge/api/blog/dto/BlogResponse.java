@@ -40,6 +40,9 @@ public class BlogResponse {
     @JsonProperty("totalRatings")
     private int totalRatings;
 
+    @JsonProperty("totalComments")
+    private int totalComments;
+
     private BlogCategoryDto category;
     private BlogAuthorDto author;
 
