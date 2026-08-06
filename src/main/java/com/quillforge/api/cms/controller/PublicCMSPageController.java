@@ -1,6 +1,7 @@
 package com.quillforge.api.cms.controller;
 
 import com.quillforge.api.cms.dto.CMSPageResponse;
+import com.quillforge.api.cms.dto.CMSPageMetricDto;
 import com.quillforge.api.cms.service.CMSPageService;
 import com.quillforge.api.common.dto.ApiResponse;
 import com.quillforge.api.common.dto.PaginatedResponse;
@@ -12,11 +13,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/pages")
@@ -47,5 +46,35 @@ public class PublicCMSPageController {
     public ResponseEntity<ApiResponse<CMSPageResponse>> getPageBySlug(@PathVariable String slug) {
         CMSPageResponse response = cmsPageService.getCMSPageBySlug(slug);
         return ResponseEntity.ok(ApiResponse.success("CMS Page retrieved successfully", response));
+    }
+
+    @PostMapping("/{pageId}/views")
+    @Operation(summary = "Track CMS Page view metric with referrer")
+    public ResponseEntity<ApiResponse<CMSPageMetricDto>> trackView(
+            @PathVariable UUID pageId,
+            @RequestParam(value = "referrer", required = false) String referrer,
+            jakarta.servlet.http.HttpServletRequest request
+    ) {
+        String ipAddress = getClientIp(request);
+        String userAgent = request.getHeader("User-Agent");
+        CMSPageMetricDto response = cmsPageService.incrementMetricWithAnalytics(pageId, "view", referrer, ipAddress, userAgent);
+        return ResponseEntity.ok(ApiResponse.success("View tracked successfully", response));
+    }
+
+    private String getClientIp(jakarta.servlet.http.HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("Proxy-Client-IP");
+        }
+        if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("WL-Proxy-Client-IP");
+        }
+        if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getRemoteAddr();
+        }
+        if (ip != null && ip.contains(",")) {
+            ip = ip.split(",")[0].trim();
+        }
+        return ip;
     }
 }

@@ -291,18 +291,18 @@ public class DashboardController {
         return blogMetricRepository.findByBlogId(blogId).orElseGet(() -> {
             BlogMetric m = new BlogMetric();
             m.setBlogId(blogId);
-            m.setViews((int) (Math.random() * 500) + 120);
-            m.setLikes((int) (m.getViews() * (Math.random() * 0.15 + 0.05)));
-            m.setReadProgressCount((int) (m.getViews() * (Math.random() * 0.40 + 0.30)));
-            m.setGoogleViews((int) (m.getViews() * 0.4));
-            m.setTwitterViews((int) (m.getViews() * 0.2));
-            m.setLinkedinViews((int) (m.getViews() * 0.2));
-            m.setDirectViews((int) (m.getViews() * 0.1));
-            m.setOtherViews((int) (m.getViews() * 0.1));
-            m.setUniqueViews((int) (m.getViews() * (Math.random() * 0.2 + 0.6)));
-            m.setMobileViews((int) (m.getViews() * 0.5));
-            m.setTabletViews((int) (m.getViews() * 0.15));
-            m.setDesktopViews((int) (m.getViews() * 0.35));
+            m.setViews(0);
+            m.setLikes(0);
+            m.setReadProgressCount(0);
+            m.setGoogleViews(0);
+            m.setTwitterViews(0);
+            m.setLinkedinViews(0);
+            m.setDirectViews(0);
+            m.setOtherViews(0);
+            m.setUniqueViews(0);
+            m.setMobileViews(0);
+            m.setTabletViews(0);
+            m.setDesktopViews(0);
             return blogMetricRepository.save(m);
         });
     }

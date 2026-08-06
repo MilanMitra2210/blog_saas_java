@@ -41,4 +41,7 @@ public class CMSPageResponse {
 
     @JsonProperty("updatedBy")
     private UserAuditDto updatedBy;
+
+    @JsonProperty("metrics")
+    private CMSPageMetricDto metrics;
 }
