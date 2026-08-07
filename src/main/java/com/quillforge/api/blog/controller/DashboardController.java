@@ -2,10 +2,10 @@ package com.quillforge.api.blog.controller;
 
 import com.quillforge.api.blog.entity.Blog;
 import com.quillforge.api.blog.entity.BlogComment;
-import com.quillforge.api.blog.entity.BlogMetric;
+import com.quillforge.api.common.entity.AnalyticsMetric;
 import com.quillforge.api.blog.repository.BlogRepository;
 import com.quillforge.api.blog.repository.BlogCommentRepository;
-import com.quillforge.api.blog.repository.BlogMetricRepository;
+import com.quillforge.api.common.repository.AnalyticsMetricRepository;
 import com.quillforge.api.common.dto.ApiResponse;
 import com.quillforge.api.common.dto.PaginatedResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,12 +42,12 @@ public class DashboardController {
 
     private final BlogRepository blogRepository;
     private final BlogCommentRepository blogCommentRepository;
-    private final BlogMetricRepository blogMetricRepository;
+    private final AnalyticsMetricRepository analyticsMetricRepository;
     private final EnquiryRepository enquiryRepository;
     private final EnquiryMapper enquiryMapper;
 
     @GetMapping("/stats")
-    @Transactional(readOnly = true)
+    @Transactional
     @Operation(summary = "Fetch dashboard metrics, recent activity, and analytics summary")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getDashboardStats() {
         long totalBlogs = blogRepository.count();
@@ -76,7 +76,7 @@ public class DashboardController {
                 .toList();
 
         // Aggregate stats
-        List<BlogMetric> metrics = new ArrayList<>();
+        List<AnalyticsMetric> metrics = new ArrayList<>();
         for (Blog b : blogRepository.findAll()) {
             metrics.add(getOrCreateBlogMetric(b.getId()));
         }
@@ -92,7 +92,7 @@ public class DashboardController {
         long totalMobileViews = 0;
         long totalTabletViews = 0;
         long totalDesktopViews = 0;
-        for (BlogMetric m : metrics) {
+        for (AnalyticsMetric m : metrics) {
             totalViews += m.getViews();
             totalLikes += m.getLikes();
             totalCompletions += m.getReadProgressCount();
@@ -110,13 +110,13 @@ public class DashboardController {
         long overallReach = totalViews + (totalComments * 5) + (totalLikes * 2);
 
         // Fetch Top 5 performing posts
-        List<BlogMetric> sortedMetrics = new ArrayList<>(metrics);
+        List<AnalyticsMetric> sortedMetrics = new ArrayList<>(metrics);
         sortedMetrics.sort((m1, m2) -> Integer.compare(m2.getViews(), m1.getViews()));
-        List<BlogMetric> top5Metrics = sortedMetrics.subList(0, Math.min(5, sortedMetrics.size()));
+        List<AnalyticsMetric> top5Metrics = sortedMetrics.subList(0, Math.min(5, sortedMetrics.size()));
 
         List<Map<String, Object>> topPosts = new ArrayList<>();
-        for (BlogMetric m : top5Metrics) {
-            Optional<Blog> optBlog = blogRepository.findById(m.getBlogId());
+        for (AnalyticsMetric m : top5Metrics) {
+            Optional<Blog> optBlog = blogRepository.findById(m.getEntityId());
             if (optBlog.isPresent()) {
                 Blog b = optBlog.get();
                 if (b.isPublished()) {
@@ -224,7 +224,7 @@ public class DashboardController {
         // Map blogs to metrics list
         List<Map<String, Object>> items = new ArrayList<>();
         for (Blog b : blogs) {
-            BlogMetric metric = getOrCreateBlogMetric(b.getId());
+            AnalyticsMetric metric = getOrCreateBlogMetric(b.getId());
             int views = metric.getViews();
             int likes = metric.getLikes();
             int completions = metric.getReadProgressCount();
@@ -247,34 +247,24 @@ public class DashboardController {
             item.put("googleViews", metric.getGoogleViews());
             item.put("twitterViews", metric.getTwitterViews());
             item.put("linkedinViews", metric.getLinkedinViews());
-            item.put("directViews", metric.getDirectViews() + metric.getOtherViews());
+            item.put("directViews", metric.getDirectViews());
             item.put("uniqueViews", metric.getUniqueViews());
             item.put("mobileViews", metric.getMobileViews());
             item.put("tabletViews", metric.getTabletViews());
             item.put("desktopViews", metric.getDesktopViews());
+
             items.add(item);
         }
 
-        // Sort items
-        if ("likes".equalsIgnoreCase(sortBy)) {
-            items.sort((i1, i2) -> Integer.compare((Integer) i2.get("likes"), (Integer) i1.get("likes")));
-        } else if ("completions".equalsIgnoreCase(sortBy)) {
-            items.sort((i1, i2) -> Integer.compare((Integer) i2.get("completions"), (Integer) i1.get("completions")));
-        } else {
-            items.sort((i1, i2) -> Integer.compare((Integer) i2.get("views"), (Integer) i1.get("views")));
-        }
+        // Sort items by views desc
+        items.sort((i1, i2) -> Integer.compare((int) i2.get("views"), (int) i1.get("views")));
 
-        // Paginate
+        // Pagination manually
         int total = items.size();
+        int totalPages = (int) Math.ceil((double) total / limit);
         int fromIndex = (page - 1) * limit;
         int toIndex = Math.min(fromIndex + limit, total);
-
-        List<Map<String, Object>> paginatedItems = new ArrayList<>();
-        if (fromIndex < total) {
-            paginatedItems = items.subList(fromIndex, toIndex);
-        }
-
-        int totalPages = (int) Math.ceil((double) total / limit);
+        List<Map<String, Object>> paginatedItems = fromIndex < total ? items.subList(fromIndex, toIndex) : new ArrayList<>();
 
         PaginatedResponse<Map<String, Object>> response = PaginatedResponse.<Map<String, Object>>builder()
                 .items(paginatedItems)
@@ -287,10 +277,11 @@ public class DashboardController {
         return ResponseEntity.ok(ApiResponse.success("Blog posts metrics retrieved successfully", response));
     }
 
-    private BlogMetric getOrCreateBlogMetric(UUID blogId) {
-        return blogMetricRepository.findByBlogId(blogId).orElseGet(() -> {
-            BlogMetric m = new BlogMetric();
-            m.setBlogId(blogId);
+    private AnalyticsMetric getOrCreateBlogMetric(UUID blogId) {
+        return analyticsMetricRepository.findByEntityIdAndEntityType(blogId, "blog").orElseGet(() -> {
+            AnalyticsMetric m = new AnalyticsMetric();
+            m.setEntityId(blogId);
+            m.setEntityType("blog");
             m.setViews(0);
             m.setLikes(0);
             m.setReadProgressCount(0);
@@ -303,7 +294,7 @@ public class DashboardController {
             m.setMobileViews(0);
             m.setTabletViews(0);
             m.setDesktopViews(0);
-            return blogMetricRepository.save(m);
+            return analyticsMetricRepository.save(m);
         });
     }
 }

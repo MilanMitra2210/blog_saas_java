@@ -21,6 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.cache.annotation.Cacheable;
 import com.quillforge.api.common.service.RevalidationService;
+import com.quillforge.api.common.service.AnalyticsBufferService;
+import com.quillforge.api.common.entity.AnalyticsMetric;
+import com.quillforge.api.common.repository.AnalyticsMetricRepository;
+import com.quillforge.api.common.repository.AnalyticsViewLogRepository;
+import com.quillforge.api.common.entity.EngagementMilestone;
+import com.quillforge.api.common.repository.EngagementMilestoneRepository;
 import java.time.Instant;
 import java.util.UUID;
 import java.nio.charset.StandardCharsets;
@@ -38,8 +44,10 @@ public class CMSPageServiceImpl implements CMSPageService {
     private final CMSPageMapper cmsPageMapper;
     private final MediaMapper mediaMapper;
     private final SeoMapper seoMapper;
-    private final CMSPageMetricRepository cmsPageMetricRepository;
-    private final CMSPageViewLogRepository cmsPageViewLogRepository;
+    private final AnalyticsMetricRepository analyticsMetricRepository;
+    private final AnalyticsViewLogRepository analyticsViewLogRepository;
+    private final EngagementMilestoneRepository engagementMilestoneRepository;
+    private final AnalyticsBufferService analyticsBufferService;
 
     @Override
     @Cacheable(value = "cms_pages_list", key = "'list:' + (#search ?: '') + '-' + (#status ?: '') + '-' + #pageable.pageNumber + '-' + #pageable.pageSize")
@@ -55,7 +63,7 @@ public class CMSPageServiceImpl implements CMSPageService {
 
         return cmsPage.map(p -> {
             CMSPageResponse dto = cmsPageMapper.toResponse(p);
-            CMSPageMetric m = getOrCreateCMSPageMetric(p.getId());
+            AnalyticsMetric m = getOrCreateCMSPageMetric(p.getId());
             dto.setMetrics(cmsPageMapper.toDto(m));
             // Enrich with metaImage details if imageId exists
             if (p.getSeo() != null && p.getSeo().getMetaImageId() != null) {
@@ -85,6 +93,13 @@ public class CMSPageServiceImpl implements CMSPageService {
         }
 
         CMSPage saved = cmsPageRepository.save(page);
+        
+        // Initialize metrics
+        AnalyticsMetric metric = new AnalyticsMetric();
+        metric.setEntityId(saved.getId());
+        metric.setEntityType("cms_page");
+        analyticsMetricRepository.save(metric);
+
         revalidationService.revalidate("cms_page", saved.getSlug(), "create");
         return cmsPageMapper.toResponse(saved);
     }
@@ -143,7 +158,7 @@ public class CMSPageServiceImpl implements CMSPageService {
                 .orElseThrow(() -> new ResourceNotFoundException("CMSPage", id));
         
         CMSPageResponse dto = cmsPageMapper.toResponse(page);
-        CMSPageMetric m = getOrCreateCMSPageMetric(page.getId());
+        AnalyticsMetric m = getOrCreateCMSPageMetric(page.getId());
         dto.setMetrics(cmsPageMapper.toDto(m));
         if (page.getSeo() != null && page.getSeo().getMetaImageId() != null) {
             Media media = mediaRepository.findById(page.getSeo().getMetaImageId()).orElse(null);
@@ -157,11 +172,20 @@ public class CMSPageServiceImpl implements CMSPageService {
     @Override
     @Cacheable(value = "cms_pages", key = "#slug")
     public CMSPageResponse getCMSPageBySlug(String slug) {
-        CMSPage page = cmsPageRepository.findBySlug(slug)
-                .orElseThrow(() -> new ResourceNotFoundException("CMSPage with slug: " + slug));
+        java.util.Optional<CMSPage> pageOpt = cmsPageRepository.findBySlug(slug);
+        
+        if (pageOpt.isEmpty()) {
+            if (slug.startsWith("/")) {
+                pageOpt = cmsPageRepository.findBySlug(slug.substring(1));
+            } else {
+                pageOpt = cmsPageRepository.findBySlug("/" + slug);
+            }
+        }
+        
+        CMSPage page = pageOpt.orElseThrow(() -> new ResourceNotFoundException("CMSPage with slug: " + slug));
         
         CMSPageResponse dto = cmsPageMapper.toResponse(page);
-        CMSPageMetric m = getOrCreateCMSPageMetric(page.getId());
+        AnalyticsMetric m = getOrCreateCMSPageMetric(page.getId());
         dto.setMetrics(cmsPageMapper.toDto(m));
         if (page.getSeo() != null && page.getSeo().getMetaImageId() != null) {
             Media media = mediaRepository.findById(page.getSeo().getMetaImageId()).orElse(null);
@@ -187,7 +211,7 @@ public class CMSPageServiceImpl implements CMSPageService {
     @Override
     @Transactional
     public CMSPageMetricDto incrementMetricWithAnalytics(UUID pageId, String metricType, String referrer, String ipAddress, String userAgent) {
-        CMSPageMetric metric = getOrCreateCMSPageMetric(pageId);
+        AnalyticsMetric metric = getOrCreateCMSPageMetric(pageId);
 
         if ("view".equalsIgnoreCase(metricType)) {
             metric.setViews(metric.getViews() + 1);
@@ -207,12 +231,13 @@ public class CMSPageServiceImpl implements CMSPageService {
             }
 
             String ipHash = hashIpAddress(ipAddress);
-            boolean isUnique = !cmsPageViewLogRepository.existsByPageIdAndIpHash(pageId, ipHash);
+            boolean isUnique = !analyticsViewLogRepository.existsByEntityIdAndEntityTypeAndIpHash(pageId, "cms_page", ipHash);
             if (isUnique && !"unknown".equals(ipHash)) {
-                CMSPageViewLog viewLog = new CMSPageViewLog();
-                viewLog.setPageId(pageId);
+                com.quillforge.api.common.entity.AnalyticsViewLog viewLog = new com.quillforge.api.common.entity.AnalyticsViewLog();
+                viewLog.setEntityId(pageId);
+                viewLog.setEntityType("cms_page");
                 viewLog.setIpHash(ipHash);
-                cmsPageViewLogRepository.save(viewLog);
+                analyticsViewLogRepository.save(viewLog);
 
                 metric.setUniqueViews(metric.getUniqueViews() + 1);
 
@@ -225,14 +250,18 @@ public class CMSPageServiceImpl implements CMSPageService {
                     metric.setDesktopViews(metric.getDesktopViews() + 1);
                 }
             }
+        } else if ("like".equalsIgnoreCase(metricType)) {
+            metric.setLikes(metric.getLikes() + 1);
+        } else if ("read_progress".equalsIgnoreCase(metricType)) {
+            metric.setReadProgressCount(metric.getReadProgressCount() + 1);
         } else {
             throw new BadRequestException("Invalid metric type");
         }
 
-        CMSPageMetric saved = cmsPageMetricRepository.save(metric);
+        AnalyticsMetric saved = analyticsMetricRepository.save(metric);
         String slug = cmsPageRepository.findById(pageId).map(CMSPage::getSlug).orElse(null);
         if (slug != null) {
-            revalidationService.revalidate("cms_page", slug, "update");
+            revalidationService.evictSpringCache("cms_page", slug);
         }
         return cmsPageMapper.toDto(saved);
     }
@@ -240,14 +269,38 @@ public class CMSPageServiceImpl implements CMSPageService {
     @Override
     @Transactional
     public CMSPageMetricDto incrementMetric(UUID pageId, String metricType) {
-        return incrementMetricWithAnalytics(pageId, metricType, null, null, null);
+        return incrementMetric(pageId, metricType, 100);
     }
 
-    private CMSPageMetric getOrCreateCMSPageMetric(UUID pageId) {
-        return cmsPageMetricRepository.findByPageId(pageId).orElseGet(() -> {
-            CMSPageMetric m = new CMSPageMetric();
-            m.setPageId(pageId);
+    @Override
+    @Transactional
+    public CMSPageMetricDto incrementMetric(UUID pageId, String metricType, int milestone) {
+        if ("like".equalsIgnoreCase(metricType)) {
+            AnalyticsMetric metric = getOrCreateCMSPageMetric(pageId);
+            metric.setLikes(metric.getLikes() + 1);
+            AnalyticsMetric saved = analyticsMetricRepository.save(metric);
+            String slug = cmsPageRepository.findById(pageId).map(CMSPage::getSlug).orElse(null);
+            if (slug != null) {
+                revalidationService.evictSpringCache("cms_page", slug);
+            }
+            return cmsPageMapper.toDto(saved);
+        } else if ("read_progress".equalsIgnoreCase(metricType)) {
+            analyticsBufferService.bufferReadProgress("cms_page", pageId, milestone);
+            AnalyticsMetric metric = getOrCreateCMSPageMetric(pageId);
+            return cmsPageMapper.toDto(metric);
+        } else {
+            throw new BadRequestException("Invalid metric type");
+        }
+    }
+
+    private AnalyticsMetric getOrCreateCMSPageMetric(UUID pageId) {
+        return analyticsMetricRepository.findByEntityIdAndEntityType(pageId, "cms_page").orElseGet(() -> {
+            AnalyticsMetric m = new AnalyticsMetric();
+            m.setEntityId(pageId);
+            m.setEntityType("cms_page");
             m.setViews(0);
+            m.setLikes(0);
+            m.setReadProgressCount(0);
             m.setGoogleViews(0);
             m.setTwitterViews(0);
             m.setLinkedinViews(0);
@@ -257,7 +310,7 @@ public class CMSPageServiceImpl implements CMSPageService {
             m.setMobileViews(0);
             m.setTabletViews(0);
             m.setDesktopViews(0);
-            return cmsPageMetricRepository.save(m);
+            return analyticsMetricRepository.save(m);
         });
     }
 

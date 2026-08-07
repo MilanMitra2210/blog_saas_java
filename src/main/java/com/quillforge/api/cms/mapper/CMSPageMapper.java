@@ -13,6 +13,6 @@ public interface CMSPageMapper {
 
     CMSPage toEntity(CMSPageRequest request);
 
-    CMSPageMetricDto toDto(CMSPageMetric metric);
-    CMSPageMetric toEntity(CMSPageMetricDto dto);
+    CMSPageMetricDto toDto(com.quillforge.api.common.entity.AnalyticsMetric metric);
+    com.quillforge.api.common.entity.AnalyticsMetric toEntity(CMSPageMetricDto dto);
 }

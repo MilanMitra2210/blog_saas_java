@@ -26,4 +26,8 @@ public class BlogMetricDto {
     private int mobileViews;
     private int tabletViews;
     private int desktopViews;
+
+    public double getCompletionRate() {
+        return views > 0 ? Math.round((double) readProgressCount / views * 100.0 * 10.0) / 10.0 : 0.0;
+    }
 }

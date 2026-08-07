@@ -4,6 +4,7 @@ import com.quillforge.api.blog.dto.*;
 import com.quillforge.api.blog.service.BlogService;
 import com.quillforge.api.common.dto.ApiResponse;
 import com.quillforge.api.common.dto.PaginatedResponse;
+import com.quillforge.api.common.service.AnalyticsBufferService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import java.util.UUID;
 public class PublicBlogController {
 
     private final BlogService blogService;
+    private final AnalyticsBufferService analyticsBufferService;
 
     @GetMapping
     @Operation(summary = "List blogs")
@@ -97,15 +99,42 @@ public class PublicBlogController {
 
     @PostMapping("/{blogId}/views")
     @Operation(summary = "Track post view metric with referrer")
-    public ResponseEntity<ApiResponse<BlogMetricDto>> trackView(
+    public ResponseEntity<ApiResponse<Void>> trackView(
             @PathVariable UUID blogId,
             @RequestParam(value = "referrer", required = false) String referrer,
+            @RequestParam(value = "search", required = false) String search,
             jakarta.servlet.http.HttpServletRequest request
     ) {
         String ipAddress = getClientIp(request);
         String userAgent = request.getHeader("User-Agent");
-        BlogMetricDto response = blogService.incrementMetricWithAnalytics(blogId, "view", referrer, ipAddress, userAgent);
-        return ResponseEntity.ok(ApiResponse.success("View tracked successfully", response));
+        analyticsBufferService.bufferView("blog", blogId, referrer, ipAddress, userAgent, search);
+        return ResponseEntity.ok(ApiResponse.success("View queued for tracking successfully", null));
+    }
+
+    @PostMapping("/slug/views/{*slug}")
+    @Operation(summary = "Track blog view by slug")
+    public ResponseEntity<ApiResponse<Void>> trackViewBySlug(
+            @PathVariable String slug,
+            @RequestParam(value = "referrer", required = false) String referrer,
+            @RequestParam(value = "search", required = false) String search,
+            jakarta.servlet.http.HttpServletRequest request
+    ) {
+        BlogResponse blog = blogService.getBlogBySlug(slug);
+        String ipAddress = getClientIp(request);
+        String userAgent = request.getHeader("User-Agent");
+        analyticsBufferService.bufferView("blog", blog.getId(), referrer, ipAddress, userAgent, search);
+        return ResponseEntity.ok(ApiResponse.success("View queued for tracking successfully", null));
+    }
+
+    @PostMapping("/slug/read-progress/{*slug}")
+    @Operation(summary = "Track blog read progress by slug with engagement milestone")
+    public ResponseEntity<ApiResponse<BlogMetricDto>> trackReadProgressBySlug(
+            @PathVariable String slug,
+            @RequestParam(value = "milestone", defaultValue = "100") int milestone
+    ) {
+        BlogResponse blog = blogService.getBlogBySlug(slug);
+        BlogMetricDto response = blogService.incrementMetric(blog.getId(), "read_progress", milestone);
+        return ResponseEntity.ok(ApiResponse.success("Read progress tracked successfully", response));
     }
 
     private String getClientIp(jakarta.servlet.http.HttpServletRequest request) {
@@ -133,9 +162,12 @@ public class PublicBlogController {
     }
 
     @PostMapping("/{blogId}/read-progress")
-    @Operation(summary = "Track read progression metric")
-    public ResponseEntity<ApiResponse<BlogMetricDto>> trackReadProgress(@PathVariable UUID blogId) {
-        BlogMetricDto response = blogService.incrementMetric(blogId, "read_progress");
+    @Operation(summary = "Track read progression metric with engagement milestone")
+    public ResponseEntity<ApiResponse<BlogMetricDto>> trackReadProgress(
+            @PathVariable UUID blogId,
+            @RequestParam(value = "milestone", defaultValue = "100") int milestone
+    ) {
+        BlogMetricDto response = blogService.incrementMetric(blogId, "read_progress", milestone);
         return ResponseEntity.ok(ApiResponse.success("Read progress tracked successfully", response));
     }
 

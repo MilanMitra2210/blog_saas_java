@@ -22,8 +22,8 @@ public interface BlogMapper {
     TagDto toDto(Tag tag);
     Tag toEntity(TagDto dto);
 
-    BlogMetricDto toDto(BlogMetric metric);
-    BlogMetric toEntity(BlogMetricDto dto);
+    BlogMetricDto toDto(com.quillforge.api.common.entity.AnalyticsMetric metric);
+    com.quillforge.api.common.entity.AnalyticsMetric toEntity(BlogMetricDto dto);
 
     BlogRevisionDto toDto(BlogRevision revision);
 

@@ -41,7 +41,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/comments").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/comments").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/admin/blogs/import/template").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/blogs/*/rate", "/blogs/*/views", "/blogs/*/likes", "/blogs/*/read-progress").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/blogs/*/rate", "/blogs/*/views", "/blogs/*/likes", "/blogs/*/read-progress", "/blogs/slug/views/**", "/blogs/slug/read-progress/**", "/pages/*/views", "/pages/slug/views/**", "/pages/*/read-progress", "/pages/slug/read-progress/**").permitAll()
                         // Public documentation
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/api-docs/**", "/swagger-ui.html", "/error").permitAll()
                         // Any other request must be authenticated

@@ -11,18 +11,23 @@ import com.quillforge.api.common.entity.SeoMetadata;
 import com.quillforge.api.common.exception.BadRequestException;
 import com.quillforge.api.common.exception.ResourceNotFoundException;
 import com.quillforge.api.common.mapper.SeoMapper;
+import com.quillforge.api.common.entity.AnalyticsMetric;
+import com.quillforge.api.common.repository.AnalyticsMetricRepository;
 import com.quillforge.api.media.entity.Media;
 import com.quillforge.api.media.repository.MediaRepository;
 import com.quillforge.api.cms.repository.CMSPageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.quillforge.api.common.service.RevalidationService;
+import com.quillforge.api.common.service.AnalyticsBufferService;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.quillforge.api.common.entity.EngagementMilestone;
+import com.quillforge.api.common.repository.EngagementMilestoneRepository;
 
 import java.time.Instant;
 import java.util.*;
@@ -45,12 +50,14 @@ public class BlogServiceImpl implements BlogService {
     private final BlogCategoryRepository blogCategoryRepository;
     private final BlogAuthorRepository blogAuthorRepository;
     private final TagRepository tagRepository;
-    private final BlogMetricRepository blogMetricRepository;
+    private final AnalyticsMetricRepository analyticsMetricRepository;
+    private final com.quillforge.api.common.repository.AnalyticsViewLogRepository analyticsViewLogRepository;
     private final BlogRevisionRepository blogRevisionRepository;
     private final BlogSlugRedirectRepository blogSlugRedirectRepository;
     private final MediaRepository mediaRepository;
     private final CMSPageRepository cmsPageRepository;
-    private final BlogViewLogRepository blogViewLogRepository;
+    private final EngagementMilestoneRepository engagementMilestoneRepository;
+    private final AnalyticsBufferService analyticsBufferService;
 
     private final BlogMapper blogMapper;
     private final SeoMapper seoMapper;
@@ -174,7 +181,7 @@ public class BlogServiceImpl implements BlogService {
 
         return PaginatedResponse.of(blogPage, b -> {
             BlogResponse res = blogMapper.toResponse(b);
-            BlogMetric m = getOrCreateBlogMetric(b.getId());
+            AnalyticsMetric m = getOrCreateBlogMetric(b.getId());
             res.setMetrics(blogMapper.toDto(m));
             long count = blogCommentRepository.countByPostIdAndApprovedTrue(b.getId());
             res.setTotalComments((int) count);
@@ -183,7 +190,9 @@ public class BlogServiceImpl implements BlogService {
     }
 
     private UUID parseUuid(String value) {
-        if (value == null || value.isBlank()) return null;
+        if (value == null || value.isBlank()) {
+            return null;
+        }
         try {
             return UUID.fromString(value);
         } catch (IllegalArgumentException e) {
@@ -196,7 +205,7 @@ public class BlogServiceImpl implements BlogService {
         Blog blog = blogRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Blog", id));
         BlogResponse res = blogMapper.toResponse(blog);
-        BlogMetric m = getOrCreateBlogMetric(blog.getId());
+        AnalyticsMetric m = getOrCreateBlogMetric(blog.getId());
         res.setMetrics(blogMapper.toDto(m));
         long count = blogCommentRepository.countByPostIdAndApprovedTrue(blog.getId());
         res.setTotalComments((int) count);
@@ -206,10 +215,11 @@ public class BlogServiceImpl implements BlogService {
     @Override
     @Cacheable(value = "blogs", key = "#slug")
     public BlogResponse getBlogBySlug(String slug) {
-        Blog blog = blogRepository.findBySlug(slug)
-                .orElseThrow(() -> new ResourceNotFoundException("Blog with slug: " + slug));
+        String cleanSlug = slug.startsWith("/") ? slug.substring(1) : slug;
+        Blog blog = blogRepository.findBySlug(cleanSlug)
+                .orElseThrow(() -> new ResourceNotFoundException("Blog with slug: " + cleanSlug));
         BlogResponse res = blogMapper.toResponse(blog);
-        BlogMetric m = getOrCreateBlogMetric(blog.getId());
+        AnalyticsMetric m = getOrCreateBlogMetric(blog.getId());
         res.setMetrics(blogMapper.toDto(m));
         long count = blogCommentRepository.countByPostIdAndApprovedTrue(blog.getId());
         res.setTotalComments((int) count);
@@ -229,9 +239,10 @@ public class BlogServiceImpl implements BlogService {
         Blog saved = blogRepository.save(blog);
 
         // Initialise metrics
-        BlogMetric metric = new BlogMetric();
-        metric.setBlogId(saved.getId());
-        blogMetricRepository.save(metric);
+        AnalyticsMetric metric = new AnalyticsMetric();
+        metric.setEntityId(saved.getId());
+        metric.setEntityType("blog");
+        analyticsMetricRepository.save(metric);
 
         revalidationService.revalidate("blog", saved.getSlug(), "create");
 
@@ -471,7 +482,28 @@ public class BlogServiceImpl implements BlogService {
     @Override
     @Transactional
     public BlogMetricDto incrementMetric(UUID blogId, String metricType) {
-        return incrementMetricWithAnalytics(blogId, metricType, null, null, null);
+        return incrementMetric(blogId, metricType, 100);
+    }
+
+    @Override
+    @Transactional
+    public BlogMetricDto incrementMetric(UUID blogId, String metricType, int milestone) {
+        if ("like".equalsIgnoreCase(metricType)) {
+            AnalyticsMetric metric = getOrCreateBlogMetric(blogId);
+            metric.setLikes(metric.getLikes() + 1);
+            AnalyticsMetric saved = analyticsMetricRepository.save(metric);
+            String slug = blogRepository.findById(blogId).map(Blog::getSlug).orElse(null);
+            if (slug != null) {
+                revalidationService.evictSpringCache("blog", slug);
+            }
+            return blogMapper.toDto(saved);
+        } else if ("read_progress".equalsIgnoreCase(metricType)) {
+            analyticsBufferService.bufferReadProgress("blog", blogId, milestone);
+            AnalyticsMetric metric = getOrCreateBlogMetric(blogId);
+            return blogMapper.toDto(metric);
+        } else {
+            throw new BadRequestException("Invalid metric type");
+        }
     }
 
     @Override
@@ -483,7 +515,7 @@ public class BlogServiceImpl implements BlogService {
     @Override
     @Transactional
     public BlogMetricDto incrementMetricWithAnalytics(UUID blogId, String metricType, String referrer, String ipAddress, String userAgent) {
-        BlogMetric metric = getOrCreateBlogMetric(blogId);
+        AnalyticsMetric metric = getOrCreateBlogMetric(blogId);
 
         if ("view".equalsIgnoreCase(metricType)) {
             metric.setViews(metric.getViews() + 1);
@@ -503,12 +535,13 @@ public class BlogServiceImpl implements BlogService {
             }
 
             String ipHash = hashIpAddress(ipAddress);
-            boolean isUnique = !blogViewLogRepository.existsByBlogIdAndIpHash(blogId, ipHash);
+            boolean isUnique = !analyticsViewLogRepository.existsByEntityIdAndEntityTypeAndIpHash(blogId, "blog", ipHash);
             if (isUnique && !"unknown".equals(ipHash)) {
-                BlogViewLog viewLog = new BlogViewLog();
-                viewLog.setBlogId(blogId);
+                com.quillforge.api.common.entity.AnalyticsViewLog viewLog = new com.quillforge.api.common.entity.AnalyticsViewLog();
+                viewLog.setEntityId(blogId);
+                viewLog.setEntityType("blog");
                 viewLog.setIpHash(ipHash);
-                blogViewLogRepository.save(viewLog);
+                analyticsViewLogRepository.save(viewLog);
 
                 metric.setUniqueViews(metric.getUniqueViews() + 1);
 
@@ -529,10 +562,10 @@ public class BlogServiceImpl implements BlogService {
             throw new BadRequestException("Invalid metric type");
         }
 
-        BlogMetric saved = blogMetricRepository.save(metric);
+        AnalyticsMetric saved = analyticsMetricRepository.save(metric);
         String slug = blogRepository.findById(blogId).map(Blog::getSlug).orElse(null);
         if (slug != null) {
-            revalidationService.revalidate("blog", slug, "update");
+            revalidationService.evictSpringCache("blog", slug);
         }
         return blogMapper.toDto(saved);
     }
@@ -724,10 +757,11 @@ public class BlogServiceImpl implements BlogService {
                 .build();
     }
 
-    private BlogMetric getOrCreateBlogMetric(UUID blogId) {
-        return blogMetricRepository.findByBlogId(blogId).orElseGet(() -> {
-            BlogMetric m = new BlogMetric();
-            m.setBlogId(blogId);
+    private AnalyticsMetric getOrCreateBlogMetric(UUID blogId) {
+        return analyticsMetricRepository.findByEntityIdAndEntityType(blogId, "blog").orElseGet(() -> {
+            AnalyticsMetric m = new AnalyticsMetric();
+            m.setEntityId(blogId);
+            m.setEntityType("blog");
             m.setViews(0);
             m.setLikes(0);
             m.setReadProgressCount(0);
@@ -740,7 +774,7 @@ public class BlogServiceImpl implements BlogService {
             m.setMobileViews(0);
             m.setTabletViews(0);
             m.setDesktopViews(0);
-            return blogMetricRepository.save(m);
+            return analyticsMetricRepository.save(m);
         });
     }
 }

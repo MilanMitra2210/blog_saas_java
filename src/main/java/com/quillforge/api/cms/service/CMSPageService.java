@@ -18,4 +18,5 @@ public interface CMSPageService {
 
     CMSPageMetricDto incrementMetricWithAnalytics(UUID pageId, String metricType, String referrer, String ipAddress, String userAgent);
     CMSPageMetricDto incrementMetric(UUID pageId, String metricType);
+    CMSPageMetricDto incrementMetric(UUID pageId, String metricType, int milestone);
 }

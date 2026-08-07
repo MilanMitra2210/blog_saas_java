@@ -5,6 +5,7 @@ import com.quillforge.api.cms.dto.CMSPageMetricDto;
 import com.quillforge.api.cms.service.CMSPageService;
 import com.quillforge.api.common.dto.ApiResponse;
 import com.quillforge.api.common.dto.PaginatedResponse;
+import com.quillforge.api.common.service.AnalyticsBufferService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ import java.util.UUID;
 public class PublicCMSPageController {
 
     private final CMSPageService cmsPageService;
+    private final AnalyticsBufferService analyticsBufferService;
 
     @GetMapping
     @Operation(summary = "List CMS Pages", description = "Returns a paginated list of CMS pages, optionally filtered by status and search terms")
@@ -41,7 +43,7 @@ public class PublicCMSPageController {
         );
     }
 
-    @GetMapping("/{slug}")
+    @GetMapping("/{*slug}")
     @Operation(summary = "Get CMS Page by slug", description = "Retrieves a single CMS Page's details by its URL slug")
     public ResponseEntity<ApiResponse<CMSPageResponse>> getPageBySlug(@PathVariable String slug) {
         CMSPageResponse response = cmsPageService.getCMSPageBySlug(slug);
@@ -50,15 +52,52 @@ public class PublicCMSPageController {
 
     @PostMapping("/{pageId}/views")
     @Operation(summary = "Track CMS Page view metric with referrer")
-    public ResponseEntity<ApiResponse<CMSPageMetricDto>> trackView(
+    public ResponseEntity<ApiResponse<Void>> trackView(
             @PathVariable UUID pageId,
             @RequestParam(value = "referrer", required = false) String referrer,
+            @RequestParam(value = "search", required = false) String search,
             jakarta.servlet.http.HttpServletRequest request
     ) {
         String ipAddress = getClientIp(request);
         String userAgent = request.getHeader("User-Agent");
-        CMSPageMetricDto response = cmsPageService.incrementMetricWithAnalytics(pageId, "view", referrer, ipAddress, userAgent);
-        return ResponseEntity.ok(ApiResponse.success("View tracked successfully", response));
+        analyticsBufferService.bufferView("cms_page", pageId, referrer, ipAddress, userAgent, search);
+        return ResponseEntity.ok(ApiResponse.success("View queued for tracking successfully", null));
+    }
+
+    @PostMapping("/slug/views/{*slug}")
+    @Operation(summary = "Track CMS Page view by slug")
+    public ResponseEntity<ApiResponse<Void>> trackViewBySlug(
+            @PathVariable String slug,
+            @RequestParam(value = "referrer", required = false) String referrer,
+            @RequestParam(value = "search", required = false) String search,
+            jakarta.servlet.http.HttpServletRequest request
+    ) {
+        CMSPageResponse page = cmsPageService.getCMSPageBySlug(slug);
+        String ipAddress = getClientIp(request);
+        String userAgent = request.getHeader("User-Agent");
+        analyticsBufferService.bufferView("cms_page", page.getId(), referrer, ipAddress, userAgent, search);
+        return ResponseEntity.ok(ApiResponse.success("View queued for tracking successfully", null));
+    }
+
+    @PostMapping("/{pageId}/read-progress")
+    @Operation(summary = "Track CMS page read progression with engagement milestone")
+    public ResponseEntity<ApiResponse<CMSPageMetricDto>> trackReadProgress(
+            @PathVariable UUID pageId,
+            @RequestParam(value = "milestone", defaultValue = "100") int milestone
+    ) {
+        CMSPageMetricDto response = cmsPageService.incrementMetric(pageId, "read_progress", milestone);
+        return ResponseEntity.ok(ApiResponse.success("Read progress tracked successfully", response));
+    }
+
+    @PostMapping("/slug/read-progress/{*slug}")
+    @Operation(summary = "Track CMS page read progress by slug with engagement milestone")
+    public ResponseEntity<ApiResponse<CMSPageMetricDto>> trackReadProgressBySlug(
+            @PathVariable String slug,
+            @RequestParam(value = "milestone", defaultValue = "100") int milestone
+    ) {
+        CMSPageResponse page = cmsPageService.getCMSPageBySlug(slug);
+        CMSPageMetricDto response = cmsPageService.incrementMetric(page.getId(), "read_progress", milestone);
+        return ResponseEntity.ok(ApiResponse.success("Read progress tracked successfully", response));
     }
 
     private String getClientIp(jakarta.servlet.http.HttpServletRequest request) {

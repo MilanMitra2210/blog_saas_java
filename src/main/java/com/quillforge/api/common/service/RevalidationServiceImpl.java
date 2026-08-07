@@ -54,7 +54,8 @@ public class RevalidationServiceImpl implements RevalidationService {
         });
     }
 
-    private void evictSpringCache(String model, String slug) {
+    @Override
+    public void evictSpringCache(String model, String slug) {
         try {
             if ("blog".equals(model) || "blog_category".equals(model) || "blog_tag".equals(model) || "blog_author".equals(model)) {
                 clearCache("blogs_list");

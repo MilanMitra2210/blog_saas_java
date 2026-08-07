@@ -1,4 +1,4 @@
-package com.quillforge.api.cms.dto;
+package com.quillforge.api.common.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Getter;
@@ -8,43 +8,24 @@ import java.util.UUID;
 
 @Getter
 @Setter
-public class CMSPageMetricDto {
+public class AnalyticsMetricDto {
     private UUID id;
-
-    @JsonProperty("pageId")
-    private UUID pageId;
-
+    private UUID entityId;
+    private String entityType;
     private int views;
-    private int likes = 0;
+    private int likes;
 
     @JsonProperty("readProgressCount")
-    private int readProgressCount = 0;
+    private int readProgressCount;
 
-    @JsonProperty("googleViews")
     private int googleViews;
-
-    @JsonProperty("twitterViews")
     private int twitterViews;
-
-    @JsonProperty("linkedinViews")
     private int linkedinViews;
-
-    @JsonProperty("directViews")
     private int directViews;
-
-    @JsonProperty("otherViews")
     private int otherViews;
-
-    @JsonProperty("uniqueViews")
     private int uniqueViews;
-
-    @JsonProperty("mobileViews")
     private int mobileViews;
-
-    @JsonProperty("tabletViews")
     private int tabletViews;
-
-    @JsonProperty("desktopViews")
     private int desktopViews;
 
     public double getCompletionRate() {

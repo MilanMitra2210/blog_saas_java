@@ -1,4 +1,4 @@
-package com.quillforge.api.cms.entity;
+package com.quillforge.api.common.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -7,21 +7,32 @@ import lombok.Setter;
 import java.util.UUID;
 
 @Entity
-@Table(name = "cms_page_metrics")
+@Table(name = "analytics_metrics", indexes = {
+        @Index(name = "idx_analytics_entity", columnList = "entity_id, entity_type", unique = true)
+})
 @Getter
 @Setter
-public class CMSPageMetric {
+public class AnalyticsMetric {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false, columnDefinition = "UUID")
     private UUID id;
 
-    @Column(name = "page_id", nullable = false, unique = true)
-    private UUID pageId;
+    @Column(name = "entity_id", nullable = false)
+    private UUID entityId;
+
+    @Column(name = "entity_type", nullable = false, length = 50)
+    private String entityType;
 
     @Column(nullable = false)
     private int views = 0;
+
+    @Column(nullable = false)
+    private int likes = 0;
+
+    @Column(name = "read_progress_count", nullable = false)
+    private int readProgressCount = 0;
 
     @Column(name = "google_views", nullable = false)
     private int googleViews = 0;
@@ -49,4 +60,8 @@ public class CMSPageMetric {
 
     @Column(name = "desktop_views", nullable = false)
     private int desktopViews = 0;
+
+    public double getCompletionRate() {
+        return views > 0 ? Math.round((double) readProgressCount / views * 100.0 * 10.0) / 10.0 : 0.0;
+    }
 }

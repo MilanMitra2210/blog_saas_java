@@ -1,4 +1,4 @@
-package com.quillforge.api.blog.entity;
+package com.quillforge.api.common.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -8,20 +8,23 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "blog_view_logs", indexes = {
-        @Index(name = "idx_blog_view_logs_blog_ip", columnList = "blog_id, ip_hash", unique = true)
+@Table(name = "analytics_view_logs", indexes = {
+        @Index(name = "idx_analytics_log_entity", columnList = "entity_id, entity_type")
 })
 @Getter
 @Setter
-public class BlogViewLog {
+public class AnalyticsViewLog {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(updatable = false, nullable = false, columnDefinition = "UUID")
     private UUID id;
 
-    @Column(name = "blog_id", nullable = false)
-    private UUID blogId;
+    @Column(name = "entity_id", nullable = false)
+    private UUID entityId;
+
+    @Column(name = "entity_type", nullable = false, length = 50)
+    private String entityType;
 
     @Column(name = "ip_hash", nullable = false, length = 64)
     private String ipHash;
