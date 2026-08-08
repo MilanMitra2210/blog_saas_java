@@ -18,6 +18,7 @@ import com.quillforge.api.user.entity.User.ProviderEnum;
 import com.quillforge.api.user.mapper.UserMapper;
 import com.quillforge.api.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -38,6 +39,7 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
+import javax.crypto.SecretKey;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +52,13 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
     private final JavaMailSender mailSender;
+
+    @Value("${app.jwt.secret}")
+    private String jwtSecret;
+
+    private SecretKey getSigningKey() {
+        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    }
 
     @Override
     public PaginatedResponse<UserResponseDto> getUsers(int page, int limit, String search, RoleEnum role, String status) {
@@ -312,7 +321,7 @@ public class UserServiceImpl implements UserService {
                 .subject(email)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + 86400000))
-                .signWith(Keys.hmacShaKeyFor("dGhpcy1pcy1hLXNlY3JldC1rZXktZm9yLXF1aWxsZm9yZ2Utc3ByaW5nLWJvb3QtYmFja2VuZC1kZXZlbG9wbWVudC11c2U=".getBytes(StandardCharsets.UTF_8)))
+                .signWith(getSigningKey())
                 .compact();
 
         String link = "http://localhost:5174/reset-password?code=" + inviteToken + "&type=invite";
@@ -331,7 +340,7 @@ public class UserServiceImpl implements UserService {
     public Map<String, Object> verifyInvitation(String token) {
         try {
             String email = Jwts.parser()
-                    .verifyWith(Keys.hmacShaKeyFor("dGhpcy1pcy1hLXNlY3JldC1rZXktZm9yLXF1aWxsZm9yZ2Utc3ByaW5nLWJvb3QtYmFja2VuZC1kZXZlbG9wbWVudC11c2U=".getBytes(StandardCharsets.UTF_8)))
+                    .verifyWith(getSigningKey())
                     .build()
                     .parseSignedClaims(token)
                     .getPayload()
