@@ -55,7 +55,7 @@ public class TenantDataSourceRegistry {
 
         // Derive JDBC URL: replace base database name with tenant-specific name
         String baseUri = defaultUrl.substring(0, defaultUrl.lastIndexOf("/") + 1);
-        String tenantDbUrl = baseUri + "quillforge_" + tenantId.replace("-", "_");
+        String tenantDbUrl = baseUri + "quillforge_" + tenantId.replace("-", "_").replace(".", "_").toLowerCase();
 
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl(tenantDbUrl);

@@ -26,7 +26,7 @@ public class TenantMigrationService {
      * Entry point to migrate a tenant's data to an isolated database.
      */
     public void migrateTenantToDedicatedDatabase(String tenantId) {
-        String dbSuffix = tenantId.replace("-", "_").toLowerCase();
+        String dbSuffix = tenantId.replace("-", "_").replace(".", "_").toLowerCase();
         String dbName = "quillforge_" + dbSuffix;
 
         try {
@@ -41,11 +41,18 @@ public class TenantMigrationService {
             // 3. Bootstrap database schema tables dynamically
             bootstrapTenantSchema(tenantDataSource);
 
-            // 4. Copy tenant data table by table in dependency order
-            copyTenantData(tenantId, defaultDataSource, tenantDataSource);
+            // 4. Temporarily override TenantContext to "default" to ensure source reads hit the shared database
+            String originalTenant = TenantContext.getCurrentTenant();
+            TenantContext.setCurrentTenant(TenantContext.DEFAULT_TENANT);
+            try {
+                // Copy tenant data table by table in dependency order
+                copyTenantData(tenantId, defaultDataSource, tenantDataSource);
 
-            // 5. Purge tenant data from the shared database
-            purgeTenantData(tenantId, defaultDataSource);
+                // Purge tenant data from the shared database
+                purgeTenantData(tenantId, defaultDataSource);
+            } finally {
+                TenantContext.setCurrentTenant(originalTenant);
+            }
 
             log.info("Database migration completed successfully for tenant: {}", tenantId);
             
@@ -72,6 +79,7 @@ public class TenantMigrationService {
         jpaProperties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
         jpaProperties.put("hibernate.show_sql", "false");
         jpaProperties.put("hibernate.format_sql", "false");
+        jpaProperties.put("hibernate.physical_naming_strategy", "org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy");
         emf.setJpaProperties(jpaProperties);
         
         emf.afterPropertiesSet(); // Triggers schema creation on the tenant database
@@ -105,11 +113,47 @@ public class TenantMigrationService {
     private void copyTenantData(String tenantId, DataSource sourceDs, DataSource targetDs) throws Exception {
         log.info("Executing transactional table copy pipeline for tenant: {}", tenantId);
 
+        // 1. Clean target tables first in reverse foreign key order to prevent duplicate keys on retries
+        String[] tablesInReverse = {
+            "blog_tags_association",
+            "enquiries",
+            "utm_campaign_metrics",
+            "engagement_milestones",
+            "analytics_view_logs",
+            "analytics_metrics",
+            "content_blocks",
+            "blog_slug_redirects",
+            "blog_sub_sections",
+            "blog_sections",
+            "blog_revisions",
+            "blog_comments",
+            "cms_pages",
+            "blogs",
+            "users",
+            "blog_authors",
+            "blog_tags",
+            "blog_categories",
+            "company_settings",
+            "media",
+            "folders",
+            "roles",
+            "seo_metadata"
+        };
+        try (Connection targetConn = targetDs.getConnection();
+             Statement stmt = targetConn.createStatement()) {
+            for (String table : tablesInReverse) {
+                stmt.executeUpdate("DELETE FROM " + table);
+            }
+            log.info("Cleaned target tables in dedicated database successfully");
+        }
+
         // Copy seo_metadata first (independent but referenced by blogs and pages)
         copySeoMetadata(tenantId, sourceDs, targetDs);
 
         // Copy standard isolated tables in order of foreign key dependencies
         String[] tablesInOrder = {
+            "roles",
+            "folders",
             "media",
             "company_settings",
             "blog_categories",
@@ -119,7 +163,16 @@ public class TenantMigrationService {
             "blogs",
             "cms_pages",
             "blog_comments",
-            "analytics_metrics"
+            "blog_revisions",
+            "blog_sections",
+            "blog_sub_sections",
+            "blog_slug_redirects",
+            "content_blocks",
+            "analytics_metrics",
+            "analytics_view_logs",
+            "engagement_milestones",
+            "utm_campaign_metrics",
+            "enquiries"
         };
 
         for (String table : tablesInOrder) {
@@ -127,17 +180,20 @@ public class TenantMigrationService {
         }
 
         // Copy join/association tables
-        copyBlogPostTags(tenantId, sourceDs, targetDs);
+        copyBlogTagsAssociation(tenantId, sourceDs, targetDs);
     }
 
     private void copyTableData(String tableName, String tenantId, DataSource sourceDs, DataSource targetDs) throws Exception {
         log.info("Copying table: {}", tableName);
-        String selectSql = "SELECT * FROM " + tableName + " WHERE tenant_id = ?";
+        String selectSql = getSelectSqlForTable(tableName);
         
         try (Connection sourceConn = sourceDs.getConnection();
              PreparedStatement selectStmt = sourceConn.prepareStatement(selectSql)) {
             
-            selectStmt.setString(1, tenantId);
+            int paramCount = selectSql.length() - selectSql.replace("?", "").length();
+            for (int i = 1; i <= paramCount; i++) {
+                selectStmt.setString(i, tenantId);
+            }
             try (ResultSet rs = selectStmt.executeQuery()) {
                 ResultSetMetaData metaData = rs.getMetaData();
                 int columnCount = metaData.getColumnCount();
@@ -225,9 +281,9 @@ public class TenantMigrationService {
         }
     }
 
-    private void copyBlogPostTags(String tenantId, DataSource sourceDs, DataSource targetDs) throws Exception {
-        log.info("Copying blog_post_tags mapping for tenant: {}", tenantId);
-        String selectSql = "SELECT * FROM blog_post_tags WHERE post_id IN (SELECT id FROM blogs WHERE tenant_id = ?)";
+    private void copyBlogTagsAssociation(String tenantId, DataSource sourceDs, DataSource targetDs) throws Exception {
+        log.info("Copying blog_tags_association mapping for tenant: {}", tenantId);
+        String selectSql = "SELECT * FROM blog_tags_association WHERE blog_id IN (SELECT id FROM blogs WHERE tenant_id = ?)";
         
         try (Connection sourceConn = sourceDs.getConnection();
              PreparedStatement selectStmt = sourceConn.prepareStatement(selectSql)) {
@@ -238,7 +294,7 @@ public class TenantMigrationService {
                 ResultSetMetaData metaData = rs.getMetaData();
                 int columnCount = metaData.getColumnCount();
                 
-                StringBuilder insertSql = new StringBuilder("INSERT INTO blog_post_tags (");
+                StringBuilder insertSql = new StringBuilder("INSERT INTO blog_tags_association (");
                 StringBuilder valuesPlaceholders = new StringBuilder(" VALUES (");
                 for (int i = 1; i <= columnCount; i++) {
                     insertSql.append(metaData.getColumnName(i));
@@ -264,7 +320,7 @@ public class TenantMigrationService {
                     if (count > 0) {
                         insertStmt.executeBatch();
                     }
-                    log.info("Successfully copied {} rows for blog_post_tags", count);
+                    log.info("Successfully copied {} rows for blog_tags_association", count);
                 }
             }
         }
@@ -275,7 +331,16 @@ public class TenantMigrationService {
         
         // Remove mappings first, then delete tables in reverse dependency order
         String[] deleteQueries = {
-            "DELETE FROM blog_post_tags WHERE post_id IN (SELECT id FROM blogs WHERE tenant_id = ?)",
+            "DELETE FROM blog_tags_association WHERE blog_id IN (SELECT id FROM blogs WHERE tenant_id = ?)",
+            "DELETE FROM utm_campaign_metrics WHERE entity_id IN (SELECT id FROM blogs WHERE tenant_id = ?) OR entity_id IN (SELECT id FROM cms_pages WHERE tenant_id = ?)",
+            "DELETE FROM engagement_milestones WHERE entity_id IN (SELECT id FROM blogs WHERE tenant_id = ?) OR entity_id IN (SELECT id FROM cms_pages WHERE tenant_id = ?)",
+            "DELETE FROM analytics_view_logs WHERE entity_id IN (SELECT id FROM blogs WHERE tenant_id = ?) OR entity_id IN (SELECT id FROM cms_pages WHERE tenant_id = ?)",
+            "DELETE FROM analytics_metrics WHERE entity_id IN (SELECT id FROM blogs WHERE tenant_id = ?) OR entity_id IN (SELECT id FROM cms_pages WHERE tenant_id = ?)",
+            "DELETE FROM content_blocks WHERE page_id IN (SELECT id FROM cms_pages WHERE tenant_id = ?)",
+            "DELETE FROM blog_slug_redirects WHERE blog_id IN (SELECT id FROM blogs WHERE tenant_id = ?)",
+            "DELETE FROM blog_sub_sections WHERE section_id IN (SELECT id FROM blog_sections WHERE blog_id IN (SELECT id FROM blogs WHERE tenant_id = ?))",
+            "DELETE FROM blog_sections WHERE blog_id IN (SELECT id FROM blogs WHERE tenant_id = ?)",
+            "DELETE FROM blog_revisions WHERE blog_id IN (SELECT id FROM blogs WHERE tenant_id = ?)",
             "DELETE FROM blog_comments WHERE tenant_id = ?",
             "DELETE FROM blogs WHERE tenant_id = ?",
             "DELETE FROM cms_pages WHERE tenant_id = ?",
@@ -284,8 +349,10 @@ public class TenantMigrationService {
             "DELETE FROM blog_tags WHERE tenant_id = ?",
             "DELETE FROM blog_categories WHERE tenant_id = ?",
             "DELETE FROM company_settings WHERE tenant_id = ?",
+            "DELETE FROM enquiries WHERE tenant_id = ?",
             "DELETE FROM media WHERE tenant_id = ?",
-            "DELETE FROM analytics_metrics WHERE entity_id NOT IN (SELECT id FROM blogs) AND entity_id NOT IN (SELECT id FROM cms_pages)",
+            "DELETE FROM folders WHERE tenant_id = ?",
+            "DELETE FROM roles WHERE tenant_id = ?",
             "DELETE FROM seo_metadata WHERE id NOT IN (SELECT seo_id FROM blogs) AND id NOT IN (SELECT seo_id FROM cms_pages)"
         };
 
@@ -296,24 +363,46 @@ public class TenantMigrationService {
             try {
                 for (String sql : deleteQueries) {
                     try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-                        // Bind either 1 or 2 parameters depending on query structure
-                        int paramCount = stmt.getParameterMetaData().getParameterCount();
+                        int paramCount = sql.length() - sql.replace("?", "").length();
                         for (int i = 1; i <= paramCount; i++) {
                             stmt.setString(i, tenantId);
                         }
-                        int affectedRows = stmt.executeUpdate();
-                        log.info("Executing purge: {} -> affected {} rows", sql, affectedRows);
+                        stmt.executeUpdate();
                     }
                 }
                 conn.commit();
-                log.info("Shared data purge successfully committed for tenant {}", tenantId);
+                log.info("Successfully purged tenant {} data", tenantId);
             } catch (Exception e) {
                 conn.rollback();
-                log.error("Purging failed, rolled back changes for tenant {}", tenantId, e);
                 throw e;
             } finally {
                 conn.setAutoCommit(autoCommit);
             }
+        }
+    }
+
+    private String getSelectSqlForTable(String tableName) {
+        switch (tableName) {
+            case "analytics_metrics":
+                return "SELECT * FROM analytics_metrics WHERE entity_id IN (SELECT id FROM blogs WHERE tenant_id = ?) OR entity_id IN (SELECT id FROM cms_pages WHERE tenant_id = ?)";
+            case "analytics_view_logs":
+                return "SELECT * FROM analytics_view_logs WHERE entity_id IN (SELECT id FROM blogs WHERE tenant_id = ?) OR entity_id IN (SELECT id FROM cms_pages WHERE tenant_id = ?)";
+            case "blog_revisions":
+                return "SELECT * FROM blog_revisions WHERE blog_id IN (SELECT id FROM blogs WHERE tenant_id = ?)";
+            case "blog_sections":
+                return "SELECT * FROM blog_sections WHERE blog_id IN (SELECT id FROM blogs WHERE tenant_id = ?)";
+            case "blog_slug_redirects":
+                return "SELECT * FROM blog_slug_redirects WHERE blog_id IN (SELECT id FROM blogs WHERE tenant_id = ?)";
+            case "blog_sub_sections":
+                return "SELECT * FROM blog_sub_sections WHERE section_id IN (SELECT id FROM blog_sections WHERE blog_id IN (SELECT id FROM blogs WHERE tenant_id = ?))";
+            case "content_blocks":
+                return "SELECT * FROM content_blocks WHERE page_id IN (SELECT id FROM cms_pages WHERE tenant_id = ?)";
+            case "engagement_milestones":
+                return "SELECT * FROM engagement_milestones WHERE entity_id IN (SELECT id FROM blogs WHERE tenant_id = ?) OR entity_id IN (SELECT id FROM cms_pages WHERE tenant_id = ?)";
+            case "utm_campaign_metrics":
+                return "SELECT * FROM utm_campaign_metrics WHERE entity_id IN (SELECT id FROM blogs WHERE tenant_id = ?) OR entity_id IN (SELECT id FROM cms_pages WHERE tenant_id = ?)";
+            default:
+                return "SELECT * FROM " + tableName + " WHERE tenant_id = ?";
         }
     }
 }
