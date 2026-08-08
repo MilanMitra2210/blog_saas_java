@@ -1,4 +1,4 @@
-package com.quillforge.api.user.service;
+package com.quillforge.api.auth.service;
 
 import com.quillforge.api.user.entity.User;
 import io.jsonwebtoken.Claims;

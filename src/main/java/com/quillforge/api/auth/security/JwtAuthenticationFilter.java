@@ -1,6 +1,6 @@
-package com.quillforge.api.common.config;
+package com.quillforge.api.auth.security;
 
-import com.quillforge.api.user.service.TokenService;
+import com.quillforge.api.auth.service.TokenService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

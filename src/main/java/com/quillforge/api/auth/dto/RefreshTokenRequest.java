@@ -1,4 +1,4 @@
-package com.quillforge.api.user.dto;
+package com.quillforge.api.auth.dto;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;

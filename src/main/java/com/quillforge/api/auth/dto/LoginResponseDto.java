@@ -1,5 +1,6 @@
-package com.quillforge.api.user.dto;
+package com.quillforge.api.auth.dto;
 
+import com.quillforge.api.user.dto.UserResponseDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;

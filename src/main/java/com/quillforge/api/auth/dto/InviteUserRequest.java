@@ -1,4 +1,4 @@
-package com.quillforge.api.user.dto;
+package com.quillforge.api.auth.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -7,12 +7,9 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class LoginRequest {
+public class InviteUserRequest {
 
     @Email
     @NotBlank
     private String email;
-
-    @NotBlank
-    private String password;
 }

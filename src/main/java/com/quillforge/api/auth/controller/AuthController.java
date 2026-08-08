@@ -1,17 +1,17 @@
-package com.quillforge.api.user.controller;
+package com.quillforge.api.auth.controller;
 
 import com.quillforge.api.common.dto.ApiResponse;
-import com.quillforge.api.user.dto.ChangePasswordRequest;
+import com.quillforge.api.auth.dto.ChangePasswordRequest;
 import com.quillforge.api.user.dto.CreateUserDto;
-import com.quillforge.api.user.dto.ForgotPasswordRequest;
-import com.quillforge.api.user.dto.InviteUserRequest;
-import com.quillforge.api.user.dto.LoginRequest;
-import com.quillforge.api.user.dto.LoginResponseDto;
-import com.quillforge.api.user.dto.RefreshTokenRequest;
-import com.quillforge.api.user.dto.ResetPasswordRequest;
-import com.quillforge.api.user.dto.TokenDto;
+import com.quillforge.api.auth.dto.ForgotPasswordRequest;
+import com.quillforge.api.auth.dto.InviteUserRequest;
+import com.quillforge.api.auth.dto.LoginRequest;
+import com.quillforge.api.auth.dto.LoginResponseDto;
+import com.quillforge.api.auth.dto.RefreshTokenRequest;
+import com.quillforge.api.auth.dto.ResetPasswordRequest;
+import com.quillforge.api.auth.dto.TokenDto;
 import com.quillforge.api.user.dto.UserResponseDto;
-import com.quillforge.api.user.dto.VerifyInvitationRequest;
+import com.quillforge.api.auth.dto.VerifyInvitationRequest;
 import com.quillforge.api.user.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

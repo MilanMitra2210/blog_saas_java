@@ -1,4 +1,4 @@
-package com.quillforge.api.common.config;
+package com.quillforge.api.auth.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
