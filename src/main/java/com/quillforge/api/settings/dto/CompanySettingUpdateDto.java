@@ -24,4 +24,6 @@ public class CompanySettingUpdateDto {
     private String youtubeUrl;
     private String githubUrl;
     private String tiktokUrl;
+    private String subdomain;
+    private String customDomain;
 }

@@ -62,4 +62,10 @@ public class CompanySetting extends BaseEntity {
 
     @Column(name = "tiktok_url", length = 500)
     private String tiktokUrl;
+
+    @Column(name = "subdomain", unique = true, length = 100)
+    private String subdomain;
+
+    @Column(name = "custom_domain", unique = true, length = 255)
+    private String customDomain;
 }
