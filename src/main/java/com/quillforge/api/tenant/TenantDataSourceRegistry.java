@@ -43,10 +43,12 @@ public class TenantDataSourceRegistry {
 
     /**
      * Dynamically registers a database connection pool for a specific tenant.
+     * @return The registered DataSource instance
      */
-    public void createAndRegisterPool(String tenantId) {
+    public DataSource createAndRegisterPool(String tenantId) {
         if (routingDataSource.hasTenantDataSource(tenantId)) {
-            return;
+            // Retrieve from routingDataSource target mapping if already exists
+            return routingDataSource.getTenantDataSource(tenantId);
         }
 
         log.info("Constructing dedicated connection pool for tenant: {}", tenantId);
@@ -68,8 +70,10 @@ public class TenantDataSourceRegistry {
             HikariDataSource ds = new HikariDataSource(config);
             routingDataSource.registerTenantDataSource(tenantId, ds);
             log.info("Successfully registered connection pool for tenant: {}", tenantId);
+            return ds;
         } catch (Exception e) {
             log.error("Failed to construct connection pool for tenant: {}", tenantId, e);
+            throw new RuntimeException("Failed to register tenant connection pool", e);
         }
     }
 }
