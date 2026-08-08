@@ -49,6 +49,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         String userId = claims.get("userId", String.class);
                         String role = claims.get("role", String.class);
                         String tenantId = claims.get("tenantId", String.class);
+                        System.out.println("Tenant ID from JWT: " + tenantId);
                         if (tenantId != null) {
                             TenantContext.setCurrentTenant(tenantId);
                         }

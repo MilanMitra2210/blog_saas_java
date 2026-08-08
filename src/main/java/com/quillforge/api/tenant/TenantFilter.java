@@ -5,11 +5,14 @@ import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
 import java.io.IOException;
+import org.springframework.core.annotation.Order;
+import org.springframework.core.Ordered;
 
 /**
  * Filter to resolve tenant ID from headers or host subdomains for incoming requests.
  */
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class TenantFilter implements Filter {
 
     private final CompanySettingRepository companySettingRepository;
@@ -55,11 +58,6 @@ public class TenantFilter implements Filter {
                     tenantId = companySettingRepository.findTenantIdByCustomDomain(host).orElse(null);
                 }
             }
-        }
-
-        // 3. Fallback to default tenant
-        if (tenantId == null || tenantId.trim().isEmpty()) {
-            tenantId = TenantContext.DEFAULT_TENANT;
         }
 
         TenantContext.setCurrentTenant(tenantId);

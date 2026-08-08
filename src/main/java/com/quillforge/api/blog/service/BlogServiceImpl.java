@@ -213,7 +213,7 @@ public class BlogServiceImpl implements BlogService {
     }
 
     @Override
-    @Cacheable(value = "blogs", key = "#slug")
+    @Cacheable(value = "blogs", key = "T(com.quillforge.api.tenant.TenantContext).getCurrentTenant() + ':' + #slug")
     public BlogResponse getBlogBySlug(String slug) {
         String cleanSlug = slug.startsWith("/") ? slug.substring(1) : slug;
         Blog blog = blogRepository.findBySlug(cleanSlug)

@@ -1,5 +1,7 @@
 package com.quillforge.api.blog.entity;
 
+import org.hibernate.annotations.Filter;
+
 import com.quillforge.api.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -15,6 +17,7 @@ import java.util.UUID;
 @SQLRestriction("deleted = false")
 @Getter
 @Setter
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class BlogComment extends BaseEntity {
 
     @Column(name = "post_id", nullable = false)

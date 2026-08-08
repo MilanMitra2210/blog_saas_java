@@ -21,6 +21,7 @@ import org.springframework.data.annotation.LastModifiedBy;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import com.quillforge.api.user.entity.User;
+import com.quillforge.api.tenant.TenantContext;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -37,7 +38,6 @@ import org.hibernate.annotations.ParamDef;
 @Getter
 @Setter
 @FilterDef(name = "tenantFilter", parameters = @ParamDef(name = "tenantId", type = String.class))
-@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public abstract class BaseEntity {
 
     @Id
@@ -77,4 +77,14 @@ public abstract class BaseEntity {
     @Column(name = "tenant_id", nullable = false, length = 64)
     @ColumnDefault("'default'")
     private String tenantId = "default";
+
+    @jakarta.persistence.PrePersist
+    public void populateTenantId() {
+        String currentTenant = TenantContext.getCurrentTenant();
+        if (currentTenant != null && !currentTenant.trim().isEmpty()) {
+            if (this.tenantId == null || "default".equals(this.tenantId)) {
+                this.tenantId = currentTenant;
+            }
+        }
+    }
 }

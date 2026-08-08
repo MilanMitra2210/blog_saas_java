@@ -1,5 +1,7 @@
 package com.quillforge.api.blog.entity;
 
+import org.hibernate.annotations.Filter;
+
 import com.quillforge.api.common.entity.BaseEntity;
 import com.quillforge.api.media.entity.Media;
 import jakarta.persistence.Column;
@@ -17,6 +19,7 @@ import org.hibernate.annotations.SQLRestriction;
 @SQLRestriction("deleted = false")
 @Getter
 @Setter
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class BlogAuthor extends BaseEntity {
 
     @Column(nullable = false)

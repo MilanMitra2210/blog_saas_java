@@ -1,5 +1,7 @@
 package com.quillforge.api.user.entity;
 
+import org.hibernate.annotations.Filter;
+
 import com.quillforge.api.common.entity.BaseEntity;
 import com.quillforge.api.media.entity.Media;
 import com.quillforge.api.role.entity.Role;
@@ -22,6 +24,7 @@ import java.util.UUID;
 @SQLRestriction("deleted = false")
 @Getter
 @Setter
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class User extends BaseEntity {
 
     private String name;
@@ -69,7 +72,7 @@ public class User extends BaseEntity {
     private Role roleRel;
 
     public enum RoleEnum {
-        USER, ADMIN
+        USER, ADMIN, SUPER_ADMIN
     }
 
     public enum ProviderEnum {

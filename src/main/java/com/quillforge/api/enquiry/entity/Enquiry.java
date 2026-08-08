@@ -1,5 +1,7 @@
 package com.quillforge.api.enquiry.entity;
 
+import org.hibernate.annotations.Filter;
+
 import com.quillforge.api.common.entity.BaseEntity;
 import com.quillforge.api.media.entity.Media;
 import jakarta.persistence.*;
@@ -12,6 +14,7 @@ import org.hibernate.annotations.SQLRestriction;
 @SQLRestriction("deleted = false")
 @Getter
 @Setter
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Enquiry extends BaseEntity {
 
     @Column(nullable = false, length = 100)

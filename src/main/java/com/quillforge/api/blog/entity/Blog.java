@@ -1,5 +1,7 @@
 package com.quillforge.api.blog.entity;
 
+import org.hibernate.annotations.Filter;
+
 import com.quillforge.api.common.entity.BaseEntity;
 import com.quillforge.api.common.entity.SeoMetadata;
 import com.quillforge.api.media.entity.Media;
@@ -19,6 +21,7 @@ import java.util.List;
 @SQLRestriction("deleted = false")
 @Getter
 @Setter
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Blog extends BaseEntity {
 
     @Column(nullable = false, length = 500)
