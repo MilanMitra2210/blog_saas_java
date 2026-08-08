@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.NotFound;
 import org.hibernate.annotations.NotFoundAction;
+import org.hibernate.annotations.ColumnDefault;
 import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedBy;
@@ -67,6 +68,7 @@ public abstract class BaseEntity {
 
     private Instant deletedAt;
 
-    @Column(name = "tenant_id", nullable = false, columnDefinition = "VARCHAR(64) DEFAULT 'default'")
+    @Column(name = "tenant_id", nullable = false, length = 64)
+    @ColumnDefault("'default'")
     private String tenantId = "default";
 }

@@ -31,11 +31,6 @@ import java.util.UUID;
 @Setter
 public class CMSPage extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(updatable = false, nullable = false, columnDefinition = "UUID")
-    private UUID id;
-
     @Column(nullable = false)
     private String name;
 
