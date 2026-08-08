@@ -1,4 +1,4 @@
-package com.quillforge.api.common.config;
+package com.quillforge.api.tenant;
 
 import jakarta.persistence.EntityManager;
 import org.aspectj.lang.annotation.Aspect;

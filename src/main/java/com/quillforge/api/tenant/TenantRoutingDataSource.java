@@ -1,8 +1,9 @@
-package com.quillforge.api.common.config;
+package com.quillforge.api.tenant;
 
 import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
 import java.util.Map;
+import javax.sql.DataSource;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -26,7 +27,7 @@ public class TenantRoutingDataSource extends AbstractRoutingDataSource {
     /**
      * Dynamically registers a connection pool for a newly upgraded/migrated tenant.
      */
-    public void registerTenantDataSource(String tenantId, javax.sql.DataSource dataSource) {
+    public void registerTenantDataSource(String tenantId, DataSource dataSource) {
         dataSources.put(tenantId, dataSource);
         setTargetDataSources(dataSources);
         afterPropertiesSet(); // Force Spring to rebuild the lookup mapping

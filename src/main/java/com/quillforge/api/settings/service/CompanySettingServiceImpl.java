@@ -23,7 +23,7 @@ public class CompanySettingServiceImpl implements CompanySettingService {
 
     @Override
     @Transactional
-    @Cacheable(value = "company_settings", key = "T(com.quillforge.api.common.config.TenantContext).getCurrentTenant()")
+    @Cacheable(value = "company_settings", key = "T(com.quillforge.api.tenant.TenantContext).getCurrentTenant()")
     public CompanySettingResponseDto getCompanySettings() {
         CompanySetting setting = getOrCreateInstance();
         return companySettingMapper.toDto(setting);
@@ -31,7 +31,7 @@ public class CompanySettingServiceImpl implements CompanySettingService {
 
     @Override
     @Transactional
-    @CacheEvict(value = "company_settings", key = "T(com.quillforge.api.common.config.TenantContext).getCurrentTenant()")
+    @CacheEvict(value = "company_settings", key = "T(com.quillforge.api.tenant.TenantContext).getCurrentTenant()")
     public CompanySettingResponseDto updateCompanySettings(CompanySettingUpdateDto dto) {
         CompanySetting setting = getOrCreateInstance();
         companySettingMapper.updateEntityFromDto(dto, setting);

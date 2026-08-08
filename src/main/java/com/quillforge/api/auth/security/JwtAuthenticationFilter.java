@@ -1,7 +1,7 @@
 package com.quillforge.api.auth.security;
 
 import com.quillforge.api.auth.service.TokenService;
-import com.quillforge.api.common.config.TenantContext;
+import com.quillforge.api.tenant.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

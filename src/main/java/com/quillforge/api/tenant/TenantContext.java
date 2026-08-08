@@ -1,4 +1,4 @@
-package com.quillforge.api.common.config;
+package com.quillforge.api.tenant;
 
 /**
  * Thread-local context to store the current request's tenant identifier.

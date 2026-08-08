@@ -1,4 +1,4 @@
-package com.quillforge.api.common.config;
+package com.quillforge.api.tenant;
 
 import com.quillforge.api.settings.repository.CompanySettingRepository;
 import jakarta.servlet.*;
