@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 @org.springframework.scheduling.annotation.EnableScheduling
+@org.springframework.context.annotation.EnableAspectJAutoProxy
 public class QuillForgeApplication {
 
     public static void main(String[] args) {

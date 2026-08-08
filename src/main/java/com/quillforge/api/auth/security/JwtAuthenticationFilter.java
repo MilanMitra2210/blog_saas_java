@@ -1,6 +1,7 @@
 package com.quillforge.api.auth.security;
 
 import com.quillforge.api.auth.service.TokenService;
+import com.quillforge.api.common.config.TenantContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -47,6 +48,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         String email = claims.getSubject();
                         String userId = claims.get("userId", String.class);
                         String role = claims.get("role", String.class);
+                        String tenantId = claims.get("tenantId", String.class);
+                        if (tenantId != null) {
+                            TenantContext.setCurrentTenant(tenantId);
+                        }
 
                         String authorityName = "ROLE_" + (role != null ? role : "USER");
                         SimpleGrantedAuthority authority = new SimpleGrantedAuthority(authorityName);

@@ -35,6 +35,7 @@ public class TokenService {
         claims.put("role", user.getRole().name());
         claims.put("name", user.getName());
         claims.put("userId", user.getId().toString());
+        claims.put("tenantId", user.getTenantId());
 
         return Jwts.builder()
                 .claims(claims)
