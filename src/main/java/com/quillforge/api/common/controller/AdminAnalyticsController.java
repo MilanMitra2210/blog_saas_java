@@ -5,10 +5,13 @@ import com.quillforge.api.common.dto.UtmCampaignMetricDto;
 import com.quillforge.api.common.entity.UtmCampaignMetric;
 import com.quillforge.api.common.repository.UtmCampaignMetricRepository;
 import com.quillforge.api.common.dto.EngagementMilestoneDto;
+import com.quillforge.api.common.dto.GeoMetricDto;
 import com.quillforge.api.common.entity.EngagementMilestone;
 import com.quillforge.api.common.entity.AnalyticsMetric;
 import com.quillforge.api.common.repository.EngagementMilestoneRepository;
 import com.quillforge.api.common.repository.AnalyticsMetricRepository;
+import com.quillforge.api.common.repository.GeoMetricRepository;
+import com.quillforge.api.common.entity.GeoMetric;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +34,7 @@ public class AdminAnalyticsController {
     private final UtmCampaignMetricRepository utmCampaignMetricRepository;
     private final EngagementMilestoneRepository engagementMilestoneRepository;
     private final AnalyticsMetricRepository analyticsMetricRepository;
+    private final GeoMetricRepository geoMetricRepository;
 
     @GetMapping("/utm")
     @Operation(summary = "Get UTM campaign analytics for a page or blog post")
@@ -52,6 +56,28 @@ public class AdminAnalyticsController {
         }).collect(Collectors.toList());
 
         return ResponseEntity.ok(ApiResponse.success("UTM campaign analytics retrieved successfully", dtos));
+    }
+
+    @GetMapping("/geo")
+    @Operation(summary = "Get geographic views for a page or blog post")
+    public ResponseEntity<ApiResponse<List<GeoMetricDto>>> getGeoMetrics(
+            @RequestParam UUID entityId,
+            @RequestParam String entityType
+    ) {
+        List<GeoMetric> metrics = geoMetricRepository.findByEntityIdAndEntityType(entityId, entityType);
+        
+        List<GeoMetricDto> dtos = metrics.stream().map(m -> {
+            GeoMetricDto dto = new GeoMetricDto();
+            dto.setId(m.getId());
+            dto.setEntityId(m.getEntityId());
+            dto.setEntityType(m.getEntityType());
+            dto.setCountryCode(m.getCountryCode());
+            dto.setViews(m.getViews());
+            dto.setUniqueViews(m.getUniqueViews());
+            return dto;
+        }).collect(Collectors.toList());
+
+        return ResponseEntity.ok(ApiResponse.success("Geographic metrics retrieved successfully", dtos));
     }
 
     @GetMapping("/engagement")

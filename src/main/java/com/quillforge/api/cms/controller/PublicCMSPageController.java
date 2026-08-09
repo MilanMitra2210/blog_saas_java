@@ -60,7 +60,8 @@ public class PublicCMSPageController {
     ) {
         String ipAddress = getClientIp(request);
         String userAgent = request.getHeader("User-Agent");
-        analyticsBufferService.bufferView("cms_page", pageId, referrer, ipAddress, userAgent, search);
+        String country = request.getHeader("X-Client-Country");
+        analyticsBufferService.bufferView("cms_page", pageId, referrer, ipAddress, userAgent, search, country);
         return ResponseEntity.ok(ApiResponse.success("View queued for tracking successfully", null));
     }
 
@@ -75,7 +76,8 @@ public class PublicCMSPageController {
         CMSPageResponse page = cmsPageService.getCMSPageBySlug(slug);
         String ipAddress = getClientIp(request);
         String userAgent = request.getHeader("User-Agent");
-        analyticsBufferService.bufferView("cms_page", page.getId(), referrer, ipAddress, userAgent, search);
+        String country = request.getHeader("X-Client-Country");
+        analyticsBufferService.bufferView("cms_page", page.getId(), referrer, ipAddress, userAgent, search, country);
         return ResponseEntity.ok(ApiResponse.success("View queued for tracking successfully", null));
     }
 
