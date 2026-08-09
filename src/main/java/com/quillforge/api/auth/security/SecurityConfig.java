@@ -31,6 +31,7 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ASYNC).permitAll()
                         // Public auth and registration
                         .requestMatchers("/users/login", "/users/register", "/users/refresh-token",
                                 "/users/forgot-password", "/users/reset-password", "/users/verify-invitation",
@@ -41,7 +42,7 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/comments").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/comments").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/admin/blogs/import/template").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/blogs/*/rate", "/blogs/*/views", "/blogs/*/likes", "/blogs/*/read-progress", "/blogs/slug/views/**", "/blogs/slug/read-progress/**", "/pages/*/views", "/pages/slug/views/**", "/pages/*/read-progress", "/pages/slug/read-progress/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/blogs/*/rate", "/blogs/*/views", "/blogs/*/likes", "/blogs/*/read-progress", "/blogs/slug/views/**", "/blogs/slug/read-progress/**", "/blogs/slug/heartbeat/**", "/pages/*/views", "/pages/slug/views/**", "/pages/*/read-progress", "/pages/slug/read-progress/**", "/pages/slug/heartbeat/**").permitAll()
                         // Public documentation
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/api-docs/**", "/swagger-ui.html", "/error").permitAll()
                         // Any other request must be authenticated

@@ -17,6 +17,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.quillforge.api.tenant.TenantContext;
+import java.time.Duration;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -526,5 +528,31 @@ public class AnalyticsBufferServiceImpl implements AnalyticsBufferService {
                 log.error("Failed to flush Geo metrics for key: {}", geoKey, e);
             }
         }
+    }
+
+    @Override
+    public void registerHeartbeat(String type, UUID entityId, String visitorId) {
+        String tenantId = TenantContext.getCurrentTenant();
+        if (tenantId == null || tenantId.trim().isEmpty()) {
+            tenantId = "default";
+        }
+        String activeKey = "analytics:active:" + tenantId + ":" + type + ":" + entityId + ":" + visitorId;
+        redisTemplate.opsForValue().set(activeKey, "active", Duration.ofSeconds(15));
+    }
+
+    @Override
+    public long getActiveReaders(String tenantId, String type, UUID entityId) {
+        String activeTenant = (tenantId == null || tenantId.trim().isEmpty()) ? "default" : tenantId;
+        String pattern = "analytics:active:" + activeTenant + ":" + type + ":" + entityId + ":*";
+        Set<String> keys = redisTemplate.keys(pattern);
+        return keys != null ? keys.size() : 0;
+    }
+
+    @Override
+    public long getTotalActiveReaders(String tenantId) {
+        String activeTenant = (tenantId == null || tenantId.trim().isEmpty()) ? "default" : tenantId;
+        String pattern = "analytics:active:" + activeTenant + ":*";
+        Set<String> keys = redisTemplate.keys(pattern);
+        return keys != null ? keys.size() : 0;
     }
 }

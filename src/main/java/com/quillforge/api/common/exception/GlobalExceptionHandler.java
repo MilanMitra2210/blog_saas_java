@@ -17,6 +17,14 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(ex.getMessage()));
     }
 
+    @ExceptionHandler({
+        org.springframework.web.context.request.async.AsyncRequestNotUsableException.class,
+        org.springframework.web.context.request.async.AsyncRequestTimeoutException.class
+    })
+    public void handleAsyncExceptions(Exception ex) {
+        log.debug("Async request exception: {}", ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
         log.error("Unhandled system exception", ex);

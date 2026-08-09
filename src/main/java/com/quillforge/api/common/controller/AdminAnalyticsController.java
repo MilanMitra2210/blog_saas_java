@@ -20,10 +20,18 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import com.quillforge.api.tenant.TenantContext;
 
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executors;
+import com.quillforge.api.common.service.AnalyticsBufferService;
 
 @RestController
 @RequestMapping("/admin/analytics")
@@ -35,6 +43,7 @@ public class AdminAnalyticsController {
     private final EngagementMilestoneRepository engagementMilestoneRepository;
     private final AnalyticsMetricRepository analyticsMetricRepository;
     private final GeoMetricRepository geoMetricRepository;
+    private final AnalyticsBufferService analyticsBufferService;
 
     @GetMapping("/utm")
     @Operation(summary = "Get UTM campaign analytics for a page or blog post")
@@ -110,5 +119,46 @@ public class AdminAnalyticsController {
         dto.setTotalViews(totalViews);
 
         return ResponseEntity.ok(ApiResponse.success("Engagement milestones retrieved successfully", dto));
+    }
+
+    @GetMapping("/realtime/stream")
+    @Operation(summary = "Establish real-time active reader stream (SSE)")
+    public SseEmitter streamRealtimeActive(
+            @RequestParam(required = false) UUID entityId,
+            @RequestParam(required = false) String entityType
+    ) {
+        String tenantId = TenantContext.getCurrentTenant();
+        SseEmitter emitter = new SseEmitter(600_000L);
+                
+        ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+        
+        executor.scheduleAtFixedRate(() -> {
+            try {
+                long totalActive = analyticsBufferService.getTotalActiveReaders(tenantId);
+                long entityActive = 0;
+                if (entityId != null && entityType != null) {
+                    entityActive = analyticsBufferService.getActiveReaders(tenantId, entityType, entityId);
+                }
+                
+                Map<String, Object> data = new HashMap<>();
+                data.put("totalActive", totalActive);
+                data.put("entityActive", entityActive);
+                
+                emitter.send(SseEmitter.event()
+                        .name("active-metrics")
+                        .data(data));
+            } catch (Exception e) {
+                executor.shutdown();
+                try {
+                    emitter.complete();
+                } catch (Exception ex) {}
+            }
+        }, 0, 5, TimeUnit.SECONDS);
+        
+        emitter.onCompletion(executor::shutdown);
+        emitter.onTimeout(executor::shutdown);
+        emitter.onError(e -> executor.shutdown());
+        
+        return emitter;
     }
 }

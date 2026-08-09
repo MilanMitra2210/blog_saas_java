@@ -139,6 +139,17 @@ public class PublicBlogController {
         return ResponseEntity.ok(ApiResponse.success("Read progress tracked successfully", response));
     }
 
+    @PostMapping("/slug/heartbeat/{*slug}")
+    @Operation(summary = "Register visitor heartbeat for blog by slug")
+    public ResponseEntity<ApiResponse<Void>> registerHeartbeatBySlug(
+            @PathVariable String slug,
+            @RequestParam String visitorId
+    ) {
+        BlogResponse blog = blogService.getBlogBySlug(slug);
+        analyticsBufferService.registerHeartbeat("blog", blog.getId(), visitorId);
+        return ResponseEntity.ok(ApiResponse.success("Heartbeat registered successfully", null));
+    }
+
     private String getClientIp(jakarta.servlet.http.HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
         if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {

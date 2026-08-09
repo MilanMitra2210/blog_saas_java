@@ -102,6 +102,17 @@ public class PublicCMSPageController {
         return ResponseEntity.ok(ApiResponse.success("Read progress tracked successfully", response));
     }
 
+    @PostMapping("/slug/heartbeat/{*slug}")
+    @Operation(summary = "Register visitor heartbeat for CMS page by slug")
+    public ResponseEntity<ApiResponse<Void>> registerHeartbeatBySlug(
+            @PathVariable String slug,
+            @RequestParam String visitorId
+    ) {
+        CMSPageResponse page = cmsPageService.getCMSPageBySlug(slug);
+        analyticsBufferService.registerHeartbeat("cms_page", page.getId(), visitorId);
+        return ResponseEntity.ok(ApiResponse.success("Heartbeat registered successfully", null));
+    }
+
     private String getClientIp(jakarta.servlet.http.HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
         if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
