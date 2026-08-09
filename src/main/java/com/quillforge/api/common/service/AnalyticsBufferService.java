@@ -6,7 +6,7 @@ public interface AnalyticsBufferService {
     void bufferView(String type, UUID entityId, String referrer, String ipAddress, String userAgent, String search, String country);
     void bufferReadProgress(String type, UUID entityId, int milestone);
     void flushMetrics();
-    void registerHeartbeat(String type, UUID entityId, String visitorId);
+    void registerHeartbeat(String type, UUID entityId, String visitorId, String ipAddress, String countryHeader);
     long getActiveReaders(String tenantId, String type, UUID entityId);
     long getTotalActiveReaders(String tenantId);
 }

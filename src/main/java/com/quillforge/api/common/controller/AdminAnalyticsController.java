@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Executors;
 import com.quillforge.api.common.service.AnalyticsBufferService;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 @RestController
 @RequestMapping("/admin/analytics")
@@ -44,6 +45,7 @@ public class AdminAnalyticsController {
     private final AnalyticsMetricRepository analyticsMetricRepository;
     private final GeoMetricRepository geoMetricRepository;
     private final AnalyticsBufferService analyticsBufferService;
+    private final StringRedisTemplate redisTemplate;
 
     @GetMapping("/utm")
     @Operation(summary = "Get UTM campaign analytics for a page or blog post")
@@ -134,15 +136,38 @@ public class AdminAnalyticsController {
         
         executor.scheduleAtFixedRate(() -> {
             try {
-                long totalActive = analyticsBufferService.getTotalActiveReaders(tenantId);
+                String activeTenant = (tenantId == null || tenantId.trim().isEmpty()) ? "default" : tenantId;
+                String pattern = "analytics:active:" + activeTenant + ":*";
+                java.util.Set<String> keys = redisTemplate.keys(pattern);
+                
+                long totalActive = 0;
+                Map<String, Integer> activePosts = new HashMap<>();
+                Map<String, Integer> activeCountries = new HashMap<>();
+                
+                if (keys != null) {
+                    totalActive = keys.size();
+                    for (String key : keys) {
+                        String[] parts = key.split(":");
+                        if (parts.length >= 7) {
+                            String entityIdStr = parts[4];
+                            String countryCode = parts[5];
+                            
+                            activePosts.put(entityIdStr, activePosts.getOrDefault(entityIdStr, 0) + 1);
+                            activeCountries.put(countryCode, activeCountries.getOrDefault(countryCode, 0) + 1);
+                        }
+                    }
+                }
+                
                 long entityActive = 0;
-                if (entityId != null && entityType != null) {
-                    entityActive = analyticsBufferService.getActiveReaders(tenantId, entityType, entityId);
+                if (entityId != null) {
+                    entityActive = activePosts.getOrDefault(entityId.toString(), 0);
                 }
                 
                 Map<String, Object> data = new HashMap<>();
                 data.put("totalActive", totalActive);
                 data.put("entityActive", entityActive);
+                data.put("activePosts", activePosts);
+                data.put("activeCountries", activeCountries);
                 
                 emitter.send(SseEmitter.event()
                         .name("active-metrics")

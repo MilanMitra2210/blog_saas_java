@@ -106,10 +106,13 @@ public class PublicCMSPageController {
     @Operation(summary = "Register visitor heartbeat for CMS page by slug")
     public ResponseEntity<ApiResponse<Void>> registerHeartbeatBySlug(
             @PathVariable String slug,
-            @RequestParam String visitorId
+            @RequestParam String visitorId,
+            jakarta.servlet.http.HttpServletRequest request
     ) {
         CMSPageResponse page = cmsPageService.getCMSPageBySlug(slug);
-        analyticsBufferService.registerHeartbeat("cms_page", page.getId(), visitorId);
+        String ipAddress = getClientIp(request);
+        String country = request.getHeader("X-Client-Country");
+        analyticsBufferService.registerHeartbeat("cms_page", page.getId(), visitorId, ipAddress, country);
         return ResponseEntity.ok(ApiResponse.success("Heartbeat registered successfully", null));
     }
 

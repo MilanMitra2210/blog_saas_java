@@ -143,10 +143,13 @@ public class PublicBlogController {
     @Operation(summary = "Register visitor heartbeat for blog by slug")
     public ResponseEntity<ApiResponse<Void>> registerHeartbeatBySlug(
             @PathVariable String slug,
-            @RequestParam String visitorId
+            @RequestParam String visitorId,
+            jakarta.servlet.http.HttpServletRequest request
     ) {
         BlogResponse blog = blogService.getBlogBySlug(slug);
-        analyticsBufferService.registerHeartbeat("blog", blog.getId(), visitorId);
+        String ipAddress = getClientIp(request);
+        String country = request.getHeader("X-Client-Country");
+        analyticsBufferService.registerHeartbeat("blog", blog.getId(), visitorId, ipAddress, country);
         return ResponseEntity.ok(ApiResponse.success("Heartbeat registered successfully", null));
     }
 

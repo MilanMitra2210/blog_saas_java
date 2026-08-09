@@ -531,19 +531,23 @@ public class AnalyticsBufferServiceImpl implements AnalyticsBufferService {
     }
 
     @Override
-    public void registerHeartbeat(String type, UUID entityId, String visitorId) {
+    public void registerHeartbeat(String type, UUID entityId, String visitorId, String ipAddress, String countryHeader) {
         String tenantId = TenantContext.getCurrentTenant();
         if (tenantId == null || tenantId.trim().isEmpty()) {
             tenantId = "default";
         }
-        String activeKey = "analytics:active:" + tenantId + ":" + type + ":" + entityId + ":" + visitorId;
+        String countryCode = (countryHeader != null && !countryHeader.isEmpty()) ? countryHeader : resolveCountryFromIp(ipAddress);
+        if (countryCode == null || countryCode.isEmpty() || countryCode.equalsIgnoreCase("unknown")) {
+            countryCode = "US"; // Default fallback
+        }
+        String activeKey = "analytics:active:" + tenantId + ":" + type + ":" + entityId + ":" + countryCode.toUpperCase() + ":" + visitorId;
         redisTemplate.opsForValue().set(activeKey, "active", Duration.ofSeconds(15));
     }
 
     @Override
     public long getActiveReaders(String tenantId, String type, UUID entityId) {
         String activeTenant = (tenantId == null || tenantId.trim().isEmpty()) ? "default" : tenantId;
-        String pattern = "analytics:active:" + activeTenant + ":" + type + ":" + entityId + ":*";
+        String pattern = "analytics:active:" + activeTenant + ":" + type + ":" + entityId + ":*:*";
         Set<String> keys = redisTemplate.keys(pattern);
         return keys != null ? keys.size() : 0;
     }
@@ -551,7 +555,7 @@ public class AnalyticsBufferServiceImpl implements AnalyticsBufferService {
     @Override
     public long getTotalActiveReaders(String tenantId) {
         String activeTenant = (tenantId == null || tenantId.trim().isEmpty()) ? "default" : tenantId;
-        String pattern = "analytics:active:" + activeTenant + ":*";
+        String pattern = "analytics:active:" + activeTenant + ":*:*:*:*";
         Set<String> keys = redisTemplate.keys(pattern);
         return keys != null ? keys.size() : 0;
     }
