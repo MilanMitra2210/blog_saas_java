@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.quillforge.api.common.service.RevalidationService;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +23,7 @@ public class CompanySettingServiceImpl implements CompanySettingService {
 
     @Override
     @Transactional
-    @Cacheable(value = "company_settings")
+    @Cacheable(value = "company_settings", key = "T(com.quillforge.api.tenant.TenantContext).getCurrentTenant()")
     public CompanySettingResponseDto getCompanySettings() {
         CompanySetting setting = getOrCreateInstance();
         return companySettingMapper.toDto(setting);
@@ -30,6 +31,7 @@ public class CompanySettingServiceImpl implements CompanySettingService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "company_settings", key = "T(com.quillforge.api.tenant.TenantContext).getCurrentTenant()")
     public CompanySettingResponseDto updateCompanySettings(CompanySettingUpdateDto dto) {
         CompanySetting setting = getOrCreateInstance();
         companySettingMapper.updateEntityFromDto(dto, setting);

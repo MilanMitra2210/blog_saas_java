@@ -15,6 +15,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByEmail(String email);
 
+    @Query(value = "SELECT * FROM users WHERE email = :email AND deleted = false LIMIT 1", nativeQuery = true)
+    Optional<User> findGlobalByEmail(@Param("email") String email);
+
     boolean existsByEmail(String email);
 
     @Query(value = "SELECT * FROM users u WHERE u.email = :email AND u.deleted = true LIMIT 1", nativeQuery = true)

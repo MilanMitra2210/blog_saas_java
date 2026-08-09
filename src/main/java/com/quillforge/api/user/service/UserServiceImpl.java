@@ -100,8 +100,8 @@ public class UserServiceImpl implements UserService {
 
         User user = userMapper.toEntity(createDto);
         user.setPassword(passwordEncoder.encode(createDto.getPassword()));
-        // Default to USER role for sign-ups
-        user.setRole(RoleEnum.USER);
+        // Default to ADMIN role for new SaaS tenant registrations
+        user.setRole(RoleEnum.ADMIN);
         user.setProvider(ProviderEnum.MANUAL);
         User saved = userRepository.save(user);
         return userMapper.toDto(saved);
@@ -142,7 +142,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public LoginResponseDto login(LoginRequest loginRequest) {
-        User user = userRepository.findByEmail(loginRequest.getEmail())
+        User user = userRepository.findGlobalByEmail(loginRequest.getEmail())
                 .orElseThrow(() -> new BadRequestException("Invalid credentials"));
 
         if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
@@ -182,7 +182,7 @@ public class UserServiceImpl implements UserService {
         String email = tokenService.getEmailFromToken(refreshToken)
                 .orElseThrow(() -> new BadRequestException("Invalid refresh token claims"));
 
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findGlobalByEmail(email)
                 .orElseThrow(() -> new BadRequestException("User not found"));
 
         if (!refreshToken.equals(user.getRefreshToken())) {
@@ -287,7 +287,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void forgotPassword(String email) {
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findGlobalByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
         String resetToken = tokenService.generateAccessToken(user);
         String link = "http://localhost:5174/reset-password?code=" + resetToken + "&type=reset-password";
@@ -309,7 +309,7 @@ public class UserServiceImpl implements UserService {
         }
         String email = tokenService.getEmailFromToken(token)
                 .orElseThrow(() -> new BadRequestException("Invalid token claims"));
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findGlobalByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
         user.setPassword(passwordEncoder.encode(password));
         userRepository.save(user);
@@ -355,7 +355,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public LoginResponseDto socialLogin(String provider) {
         String email = provider + "-user@quillforge.com";
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findGlobalByEmail(email)
                 .orElseGet(() -> {
                     User newUser = new User();
                     newUser.setName(provider.substring(0, 1).toUpperCase() + provider.substring(1) + " User");

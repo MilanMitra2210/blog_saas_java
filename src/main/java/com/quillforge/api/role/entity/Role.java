@@ -1,5 +1,7 @@
 package com.quillforge.api.role.entity;
 
+import org.hibernate.annotations.Filter;
+
 import com.quillforge.api.common.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -15,6 +17,7 @@ import org.hibernate.type.SqlTypes;
 @SQLRestriction("deleted = false")
 @Getter
 @Setter
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class Role extends BaseEntity {
 
     @Column(nullable = false, unique = true)

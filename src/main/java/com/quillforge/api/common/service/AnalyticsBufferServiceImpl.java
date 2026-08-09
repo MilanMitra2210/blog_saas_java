@@ -8,6 +8,8 @@ import com.quillforge.api.common.entity.AnalyticsMetric;
 import com.quillforge.api.common.entity.AnalyticsViewLog;
 import com.quillforge.api.common.repository.AnalyticsMetricRepository;
 import com.quillforge.api.common.repository.AnalyticsViewLogRepository;
+import com.quillforge.api.common.repository.GeoMetricRepository;
+import com.quillforge.api.common.repository.UtmCampaignMetricRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,14 +40,15 @@ public class AnalyticsBufferServiceImpl implements AnalyticsBufferService {
     private final CMSPageRepository cmsPageRepository;
     private final BlogRepository blogRepository;
     private final RevalidationService revalidationService;
-    private final com.quillforge.api.common.repository.UtmCampaignMetricRepository utmCampaignMetricRepository;
+    private final UtmCampaignMetricRepository utmCampaignMetricRepository;
     private final EngagementMilestoneRepository engagementMilestoneRepository;
+    private final GeoMetricRepository geoMetricRepository;
 
     @Value("${app.revalidate.frontend-url}")
     private String frontendUrl;
 
     @Override
-    public void bufferView(String type, UUID entityId, String referrer, String ipAddress, String userAgent, String search) {
+    public void bufferView(String type, UUID entityId, String referrer, String ipAddress, String userAgent, String search, String country) {
         try {
             String pendingSetKey = "analytics:pending:" + type;
             String bufferKey = "analytics:buffer:" + type + ":" + entityId;
@@ -100,6 +103,17 @@ public class AnalyticsBufferServiceImpl implements AnalyticsBufferService {
                     redisTemplate.opsForHash().increment(utmBufferKey, "unique_views", 1);
                 }
             }
+
+            // 7. Handle Geo view tracking
+            String resolvedCountry = (country != null && !country.isEmpty()) ? country : resolveCountryFromIp(ipAddress);
+            String geoKey = String.format("%s:%s:%s", type, entityId, resolvedCountry);
+            redisTemplate.opsForSet().add("analytics:pending:geo", geoKey);
+
+            String geoBufferKey = "analytics:buffer:geo:" + geoKey;
+            redisTemplate.opsForHash().increment(geoBufferKey, "views", 1);
+            if (isUniqueView) {
+                redisTemplate.opsForHash().increment(geoBufferKey, "unique_views", 1);
+            }
         } catch (Exception e) {
             log.error("Failed to buffer analytics view for {} ID: {}", type, entityId, e);
         }
@@ -139,6 +153,7 @@ public class AnalyticsBufferServiceImpl implements AnalyticsBufferService {
         flushEntityMetrics("cms_page");
         flushEntityMetrics("blog");
         flushUtmCampaignMetrics();
+        flushGeoMetrics();
     }
 
     private void flushEntityMetrics(String type) {
@@ -447,6 +462,69 @@ public class AnalyticsBufferServiceImpl implements AnalyticsBufferService {
             return hexString.toString();
         } catch (Exception e) {
             return "unknown";
+        }
+    }
+
+    private String resolveCountryFromIp(String ip) {
+        if (ip == null || ip.isEmpty() || ip.equals("127.0.0.1") || ip.equals("0:0:0:0:0:0:0:1") || ip.equalsIgnoreCase("localhost")) {
+            String[] demoCountries = {"US", "IN", "DE", "FR", "GB", "CA", "AU"};
+            int idx = Math.abs(ip == null ? 0 : ip.hashCode()) % demoCountries.length;
+            return demoCountries[idx];
+        }
+        return "unknown";
+    }
+
+    private void flushGeoMetrics() {
+        String pendingKey = "analytics:pending:geo";
+        Set<String> pendingKeys = redisTemplate.opsForSet().members(pendingKey);
+        if (pendingKeys == null || pendingKeys.isEmpty()) {
+            return;
+        }
+
+        log.info("🚀 Flushing Geo metrics buffer for {} pending items...", pendingKeys.size());
+
+        for (String geoKey : pendingKeys) {
+            try {
+                // Format: <entityType>:<entityId>:<countryCode>
+                String[] parts = geoKey.split(":");
+                if (parts.length < 3) {
+                    redisTemplate.opsForSet().remove(pendingKey, geoKey);
+                    continue;
+                }
+
+                String entityType = parts[0];
+                UUID entityId = UUID.fromString(parts[1]);
+                String countryCode = parts[2];
+
+                String geoBufferKey = "analytics:buffer:geo:" + geoKey;
+                Map<Object, Object> fields = redisTemplate.opsForHash().entries(geoBufferKey);
+                if (fields.isEmpty()) {
+                    continue;
+                }
+
+                com.quillforge.api.common.entity.GeoMetric metric = geoMetricRepository
+                        .findByEntityIdAndEntityTypeAndCountryCode(entityId, entityType, countryCode)
+                        .orElseGet(() -> {
+                            com.quillforge.api.common.entity.GeoMetric m = new com.quillforge.api.common.entity.GeoMetric();
+                            m.setEntityId(entityId);
+                            m.setEntityType(entityType);
+                            m.setCountryCode(countryCode);
+                            m.setViews(0);
+                            m.setUniqueViews(0);
+                            return geoMetricRepository.save(m);
+                        });
+
+                metric.setViews(metric.getViews() + getIntValue(fields, "views"));
+                metric.setUniqueViews(metric.getUniqueViews() + getIntValue(fields, "unique_views"));
+                geoMetricRepository.save(metric);
+
+                // Cleanup Redis
+                redisTemplate.delete(geoBufferKey);
+                redisTemplate.opsForSet().remove(pendingKey, geoKey);
+
+            } catch (Exception e) {
+                log.error("Failed to flush Geo metrics for key: {}", geoKey, e);
+            }
         }
     }
 }

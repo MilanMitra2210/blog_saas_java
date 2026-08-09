@@ -1,5 +1,7 @@
 package com.quillforge.api.cms.entity;
 
+import org.hibernate.annotations.Filter;
+
 import com.quillforge.api.common.entity.BaseEntity;
 import com.quillforge.api.common.entity.ContentBlock;
 import com.quillforge.api.common.entity.SeoMetadata;
@@ -29,6 +31,7 @@ import java.util.UUID;
 @SQLRestriction("deleted = false")
 @Getter
 @Setter
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class CMSPage extends BaseEntity {
 
     @Column(nullable = false)

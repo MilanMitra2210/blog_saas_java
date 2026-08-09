@@ -27,4 +27,6 @@ public class CompanySettingResponseDto {
     private String youtubeUrl;
     private String githubUrl;
     private String tiktokUrl;
+    private String subdomain;
+    private String customDomain;
 }

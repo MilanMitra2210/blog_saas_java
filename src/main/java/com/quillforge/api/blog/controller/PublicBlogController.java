@@ -107,7 +107,8 @@ public class PublicBlogController {
     ) {
         String ipAddress = getClientIp(request);
         String userAgent = request.getHeader("User-Agent");
-        analyticsBufferService.bufferView("blog", blogId, referrer, ipAddress, userAgent, search);
+        String country = request.getHeader("X-Client-Country");
+        analyticsBufferService.bufferView("blog", blogId, referrer, ipAddress, userAgent, search, country);
         return ResponseEntity.ok(ApiResponse.success("View queued for tracking successfully", null));
     }
 
@@ -122,7 +123,8 @@ public class PublicBlogController {
         BlogResponse blog = blogService.getBlogBySlug(slug);
         String ipAddress = getClientIp(request);
         String userAgent = request.getHeader("User-Agent");
-        analyticsBufferService.bufferView("blog", blog.getId(), referrer, ipAddress, userAgent, search);
+        String country = request.getHeader("X-Client-Country");
+        analyticsBufferService.bufferView("blog", blog.getId(), referrer, ipAddress, userAgent, search, country);
         return ResponseEntity.ok(ApiResponse.success("View queued for tracking successfully", null));
     }
 

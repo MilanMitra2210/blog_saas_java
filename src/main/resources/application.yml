@@ -60,6 +60,7 @@ springdoc:
 
 # ---- Custom JWT Settings ----
 app:
+  domain: ${MAIN_DOMAIN:quillforge.com}
   jwt:
     secret: ${JWT_SECRET:dGhpcy1pcy1hLXNlY3JldC1rZXktZm9yLXF1aWxsZm9yZ2Utc3ByaW5nLWJvb3QtYmFja2VuZC1kZXZlbG9wbWVudC11c2U=}
     expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:900000}

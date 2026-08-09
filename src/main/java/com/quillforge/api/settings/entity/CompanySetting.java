@@ -1,5 +1,7 @@
 package com.quillforge.api.settings.entity;
 
+import org.hibernate.annotations.Filter;
+
 import com.quillforge.api.common.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -13,6 +15,7 @@ import org.hibernate.annotations.SQLRestriction;
 @SQLRestriction("deleted = false")
 @Getter
 @Setter
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class CompanySetting extends BaseEntity {
 
     @Column(name = "company_name", length = 255)
@@ -62,4 +65,10 @@ public class CompanySetting extends BaseEntity {
 
     @Column(name = "tiktok_url", length = 500)
     private String tiktokUrl;
+
+    @Column(name = "subdomain", unique = true, length = 100)
+    private String subdomain;
+
+    @Column(name = "custom_domain", unique = true, length = 255)
+    private String customDomain;
 }
