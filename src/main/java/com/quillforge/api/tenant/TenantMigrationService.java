@@ -344,15 +344,12 @@ public class TenantMigrationService {
             "DELETE FROM blog_comments WHERE tenant_id = ?",
             "DELETE FROM blogs WHERE tenant_id = ?",
             "DELETE FROM cms_pages WHERE tenant_id = ?",
-            "DELETE FROM users WHERE tenant_id = ?",
             "DELETE FROM blog_authors WHERE tenant_id = ?",
             "DELETE FROM blog_tags WHERE tenant_id = ?",
             "DELETE FROM blog_categories WHERE tenant_id = ?",
-            "DELETE FROM company_settings WHERE tenant_id = ?",
             "DELETE FROM enquiries WHERE tenant_id = ?",
             "DELETE FROM media WHERE tenant_id = ?",
             "DELETE FROM folders WHERE tenant_id = ?",
-            "DELETE FROM roles WHERE tenant_id = ?",
             "DELETE FROM seo_metadata WHERE id NOT IN (SELECT seo_id FROM blogs) AND id NOT IN (SELECT seo_id FROM cms_pages)"
         };
 

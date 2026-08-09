@@ -17,6 +17,20 @@ import org.springframework.web.bind.annotation.*;
 public class MockSubscriptionController {
 
     private final TenantMigrationService migrationService;
+    private final com.quillforge.api.settings.repository.CompanySettingRepository companySettingRepository;
+
+    @GetMapping("/tenants")
+    @Operation(summary = "Get registered client tenants", description = "Retrieves all active client tenant IDs registered in the system.")
+    public ResponseEntity<ApiResponse<java.util.List<String>>> getClientTenants() {
+        String originalTenant = TenantContext.getCurrentTenant();
+        TenantContext.setCurrentTenant(TenantContext.DEFAULT_TENANT);
+        try {
+            java.util.List<String> tenants = companySettingRepository.findActiveClientTenantIds();
+            return ResponseEntity.ok(ApiResponse.success("Client tenants retrieved successfully", tenants));
+        } finally {
+            TenantContext.setCurrentTenant(originalTenant);
+        }
+    }
 
     @PostMapping("/upgrade")
     @Operation(summary = "Simulate PRO tier upgrade", description = "Creates a dedicated PostgreSQL database, bootstraps tables, and migrates row-level data.")

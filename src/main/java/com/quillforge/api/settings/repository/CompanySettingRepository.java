@@ -18,4 +18,7 @@ public interface CompanySettingRepository extends JpaRepository<CompanySetting, 
 
     @Query(value = "SELECT tenant_id FROM company_settings WHERE custom_domain = :customDomain AND deleted = false LIMIT 1", nativeQuery = true)
     Optional<String> findTenantIdByCustomDomain(@Param("customDomain") String customDomain);
+
+    @Query(value = "SELECT DISTINCT tenant_id FROM company_settings WHERE deleted = false AND tenant_id != 'default'", nativeQuery = true)
+    java.util.List<String> findActiveClientTenantIds();
 }
