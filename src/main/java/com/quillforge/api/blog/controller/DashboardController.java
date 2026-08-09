@@ -77,16 +77,22 @@ public class DashboardController {
                 .map(enquiryMapper::toDto)
                 .toList();
 
-        // Aggregate stats across all entities (Blog & CMS Page)
-        List<AnalyticsMetric> allMetrics = analyticsMetricRepository.findAll();
-        // Ensure metrics exist for all blogs and cms pages
-        for (Blog b : blogRepository.findAll()) {
+        List<Blog> tenantBlogs = blogRepository.findAll();
+        List<com.quillforge.api.cms.entity.CMSPage> tenantPages = cmsPageRepository.findAll();
+        List<UUID> tenantEntityIds = new ArrayList<>();
+
+        for (Blog b : tenantBlogs) {
             getOrCreateMetric(b.getId(), "blog");
+            tenantEntityIds.add(b.getId());
         }
-        for (com.quillforge.api.cms.entity.CMSPage p : cmsPageRepository.findAll()) {
+        for (com.quillforge.api.cms.entity.CMSPage p : tenantPages) {
             getOrCreateMetric(p.getId(), "cms_page");
+            tenantEntityIds.add(p.getId());
         }
-        allMetrics = analyticsMetricRepository.findAll();
+
+        List<AnalyticsMetric> allMetrics = analyticsMetricRepository.findAll().stream()
+                .filter(m -> tenantEntityIds.contains(m.getEntityId()))
+                .toList();
 
         long totalViews = 0;
         long totalLikes = 0;
